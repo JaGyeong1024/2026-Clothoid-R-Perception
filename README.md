@@ -8,11 +8,7 @@ Clothoid-R 자율주행 시스템의 Perception ROS workspace.
 
 <table>
 <tr>
-<td align="center"><a href="https://github.com/lovelyoverflow"><img src="https://avatars.githubusercontent.com/u/14028864?v=4" width="100px;" alt=""/><br /><sub><b>구자경</b></sub></a><br />SLAM, Navigation</td>
-<td align="center"><a href="https://github.com/gyeongseoMin"><img src="https://avatars.githubusercontent.com/u/67200721?v=4" width="100px;" alt=""/><br /><sub><b>서준혁</b></sub></a><br />LiDAR, Obstacle Avoidance</td>
-<td align="center"><a href="https://github.com/SeoooooNyeong"><img src="https://avatars.githubusercontent.com/u/113419106?v=4" width="100px;" alt=""/><br /><sub><b>김민재</b></sub></a><br />LiDAR, Obstacle Avoidance</td>
-<td align="center"><a href="https://github.com/JOONHOGITHUB"><img src="https://avatars.githubusercontent.com/u/105336903?v=4" width="100px;" alt=""/><br /><sub><b>지연수</b></sub></a><br />Camera, Lane Detection</td>
-<td align="center"><a href="https://github.com/leeharam2004"><img src="https://avatars.githubusercontent.com/u/44737337?v=4" width="100px;" alt=""/><br /><sub><b>유인석</b></sub></a><br />Camera, Lane Detection</td>
+<td align="center"><a href="https://github.com/JaGyeong1024"><img src="https://avatars.githubusercontent.com/u/92356313?s=400&u=9df94c6f0e773e86773cb4fcc379f1204a7dcff7&v=4" width="100px;" alt=""/><br /><sub><b>구자경</b></sub></a><br />Perception Architecture</td>
 </tr>
 </table>
 
