@@ -1,0 +1,26 @@
+<launch>
+  <!-- Conda env (yolo는 ultralytics 의존이라 격리) -->
+  <arg name="conda_base"    default="$(env HOME)/anaconda3"/>
+  <arg name="conda_env"     default="clothoid"/>
+
+  <!-- I/O -->
+  <arg name="source_topic"  default="/camera/image_raw/compressed"/>
+  <arg name="output_topic"  default="/perception/camera/yolo_objects"/>
+  <arg name="confidence"    default="0.4"/>
+  <arg name="frame_id"      default="camera_link"/>
+  <arg name="ultralytics_path" default=""/>
+
+  <node pkg="yolov8"
+        type="camera_yolo_detection.py"
+        name="camera_yolo_detection"
+        output="screen"
+        launch-prefix="bash -c 'source $(arg conda_base)/etc/profile.d/conda.sh &amp;&amp; conda activate $(arg conda_env) &amp;&amp; exec $0 $*'">
+    <param name="source"           value="$(arg source_topic)"/>
+    <param name="output_topic"     value="$(arg output_topic)"/>
+    <param name="yaml_cfg"         value="$(find yolov8)/new_best0710.yaml"/>
+    <param name="pt_weights"       value="$(find yolov8)/new_best0710.pt"/>
+    <param name="confidence"       value="$(arg confidence)"/>
+    <param name="frame_id"         value="$(arg frame_id)"/>
+    <param name="ultralytics_path" value="$(arg ultralytics_path)"/>
+  </node>
+</launch>

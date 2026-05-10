@@ -1,0 +1,23 @@
+<launch>
+  <!-- Conda env (scipy, sklearn 의존이라 격리) -->
+  <arg name="conda_base"         default="$(env HOME)/anaconda3"/>
+  <arg name="conda_env"          default="clothoid"/>
+
+  <arg name="input_topic"        default="/livox/lidar"/>
+  <arg name="centroid_topic"     default="/perception/livox/centroids"/>
+  <arg name="preprocessed_topic" default="/perception/livox/preprocessed"/>
+  <arg name="frame_id"           default="livox_frame"/>
+  <arg name="config"             default="$(find livox_clustering)/config/livox_clustering.yaml"/>
+
+  <node pkg="livox_clustering"
+        type="livox_euclidean_clustering.py"
+        name="livox_euclidean_clustering"
+        output="screen"
+        launch-prefix="bash -c 'source $(arg conda_base)/etc/profile.d/conda.sh &amp;&amp; conda activate $(arg conda_env) &amp;&amp; exec $0 $*'">
+    <rosparam command="load" file="$(arg config)"/>
+    <param name="input_topic"        value="$(arg input_topic)"/>
+    <param name="centroid_topic"     value="$(arg centroid_topic)"/>
+    <param name="preprocessed_topic" value="$(arg preprocessed_topic)"/>
+    <param name="frame_id"           value="$(arg frame_id)"/>
+  </node>
+</launch>

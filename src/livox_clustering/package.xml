@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>livox_clustering</name>
+  <version>0.1.0</version>
+  <description>Livox LiDAR euclidean clustering with Kalman tracking for obstacle centroid detection.</description>
+
+  <maintainer email="wkrud4431@gmail.com">JaGyeong</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <depend>rospy</depend>
+  <depend>std_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>geometry_msgs</depend>
+</package>

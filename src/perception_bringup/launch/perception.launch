@@ -1,0 +1,54 @@
+<launch>
+  <!-- Conda env (Python perception nodes use launch-prefix) -->
+  <arg name="conda_base" default="$(env HOME)/anaconda3"/>
+  <arg name="conda_env"  default="clothoid"/>
+
+  <!-- Sensor input topics -->
+  <arg name="livox_lidar_topic"      default="/livox/lidar"/>
+  <arg name="velodyne_points_topic"  default="/velodyne_points"/>
+  <arg name="camera_image_topic"     default="/camera/image_raw/compressed"/>
+
+  <!-- Perception interface topics -->
+  <arg name="camera_yolo_topic"      default="/perception/camera/yolo_objects"/>
+  <arg name="livox_centroid_topic"   default="/perception/livox/centroids"/>
+  <arg name="fusion_centroid_topic"  default="/perception/fusion/centroids"/>
+  <arg name="velodyne_centroid_topic" default="/perception/velodyne/centroids"/>
+
+  <!-- Runtime options -->
+  <arg name="velodyne_device" default="cuda"/>
+  <arg name="ocsort_path" default="/opt/OC_SORT"/>
+  <arg name="fusion_projection_config" default="$(find livox_camera_fusion)/config/projection.yaml"/>
+  <arg name="livox_clustering_config" default="$(find livox_clustering)/config/livox_clustering.yaml"/>
+
+  <include file="$(find yolov8)/launch/yolov8.launch">
+    <arg name="conda_base" value="$(arg conda_base)"/>
+    <arg name="conda_env"  value="$(arg conda_env)"/>
+    <arg name="source_topic" value="$(arg camera_image_topic)"/>
+    <arg name="output_topic" value="$(arg camera_yolo_topic)"/>
+  </include>
+
+  <include file="$(find livox_camera_fusion)/launch/livox_camera_fusion.launch">
+    <arg name="lidar_topic" value="$(arg livox_lidar_topic)"/>
+    <arg name="camera_topic" value="$(arg camera_image_topic)"/>
+    <arg name="yolo_topic" value="$(arg camera_yolo_topic)"/>
+    <arg name="centroid_topic" value="$(arg fusion_centroid_topic)"/>
+    <arg name="projection_config" value="$(arg fusion_projection_config)"/>
+  </include>
+
+  <include file="$(find livox_clustering)/launch/livox_clustering.launch">
+    <arg name="conda_base" value="$(arg conda_base)"/>
+    <arg name="conda_env"  value="$(arg conda_env)"/>
+    <arg name="input_topic" value="$(arg livox_lidar_topic)"/>
+    <arg name="centroid_topic" value="$(arg livox_centroid_topic)"/>
+    <arg name="config" value="$(arg livox_clustering_config)"/>
+  </include>
+
+  <include file="$(find velodyne_detection)/launch/velodyne_detection.launch">
+    <arg name="conda_base" value="$(arg conda_base)"/>
+    <arg name="conda_env"  value="$(arg conda_env)"/>
+    <arg name="input_topic" value="$(arg velodyne_points_topic)"/>
+    <arg name="centroid_topic" value="$(arg velodyne_centroid_topic)"/>
+    <arg name="ocsort_path" value="$(arg ocsort_path)"/>
+    <arg name="device" value="$(arg velodyne_device)"/>
+  </include>
+</launch>

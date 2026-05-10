@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>perception_bringup</name>
+  <version>0.1.0</version>
+  <description>Integrated launch and RViz configuration for the Clothoid-R perception stack.</description>
+
+  <maintainer email="wkrud4431@gmail.com">JaGyeong</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <exec_depend>livox_camera_fusion</exec_depend>
+  <exec_depend>livox_clustering</exec_depend>
+  <exec_depend>velodyne_detection</exec_depend>
+  <exec_depend>yolov8</exec_depend>
+</package>

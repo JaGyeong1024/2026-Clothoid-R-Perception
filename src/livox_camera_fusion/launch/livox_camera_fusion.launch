@@ -1,0 +1,22 @@
+<launch>
+  <arg name="lidar_topic"  default="/livox/lidar"/>
+  <arg name="camera_topic" default="/camera/image_raw/compressed"/>
+  <arg name="yolo_topic"   default="/perception/camera/yolo_objects"/>
+  <arg name="centroid_topic" default="/perception/fusion/centroids"/>
+  <arg name="filtered_cloud_topic" default="/perception/fusion/filtered_cloud"/>
+  <arg name="frame_name"   default="livox_frame"/>
+  <arg name="projection_config" default="$(find livox_camera_fusion)/config/projection.yaml"/>
+
+  <node pkg="livox_camera_fusion"
+        type="livox_camera_fusion_node"
+        name="livox_camera_fusion"
+        output="screen">
+    <rosparam command="load" file="$(arg projection_config)"/>
+    <param name="lidar_topic"  value="$(arg lidar_topic)"/>
+    <param name="camera_topic" value="$(arg camera_topic)"/>
+    <param name="yolo_topic"   value="$(arg yolo_topic)"/>
+    <param name="centroid_topic" value="$(arg centroid_topic)"/>
+    <param name="filtered_cloud_topic" value="$(arg filtered_cloud_topic)"/>
+    <param name="frame_name"   value="$(arg frame_name)"/>
+  </node>
+</launch>

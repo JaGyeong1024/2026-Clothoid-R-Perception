@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>velodyne_detection</name>
+  <version>0.1.0</version>
+  <description>Velodyne LiDAR BEV-based object detection using YOLO and OC-SORT tracking.</description>
+
+  <maintainer email="wkrud4431@gmail.com">JaGyeong</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <depend>rospy</depend>
+  <depend>std_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>visualization_msgs</depend>
+</package>

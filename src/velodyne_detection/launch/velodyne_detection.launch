@@ -1,0 +1,39 @@
+<launch>
+  <!-- Conda env (velodyne_bev_detection도 ultralytics 의존이라 격리) -->
+  <arg name="conda_base"     default="$(env HOME)/anaconda3"/>
+  <arg name="conda_env"      default="clothoid"/>
+
+  <!-- I/O -->
+  <arg name="input_topic"    default="/velodyne_points"/>
+  <arg name="centroid_topic" default="/perception/velodyne/centroids"/>
+  <arg name="marker_topic"   default="/perception/velodyne/markers"/>
+  <arg name="image_topic"    default="/perception/velodyne/bev_image"/>
+
+  <!-- Model / Tracking -->
+  <arg name="model_version"  default="velodyne_v4"/>
+  <arg name="ocsort_path"    default="/opt/OC_SORT"/>
+  <arg name="device"         default="cuda"/>
+  <arg name="detect_conf"    default="0.4"/>
+  <arg name="frame_id"       default="velodyne"/>
+
+  <node pkg="velodyne_detection"
+        type="velodyne_bev_detection.py"
+        name="velodyne_bev_detection"
+        output="screen"
+        launch-prefix="bash -c 'source $(arg conda_base)/etc/profile.d/conda.sh &amp;&amp; conda activate $(arg conda_env) &amp;&amp; exec $0 $*'">
+    <param name="input_topic"          value="$(arg input_topic)"/>
+    <param name="centroid_topic"       value="$(arg centroid_topic)"/>
+    <param name="marker_topic"         value="$(arg marker_topic)"/>
+    <param name="image_topic"          value="$(arg image_topic)"/>
+    <param name="model_path"           value="$(find velodyne_detection)/model/$(arg model_version).pt"/>
+    <param name="ocsort_path"          value="$(arg ocsort_path)"/>
+    <param name="device"               value="$(arg device)"/>
+    <param name="detect_conf"          value="$(arg detect_conf)"/>
+    <param name="frame_id"             value="$(arg frame_id)"/>
+    <param name="voxel_size"           value="0.05"/>
+    <rosparam param="x_range">[-15.0, 15.0]</rosparam>
+    <rosparam param="y_range">[-15.0, 15.0]</rosparam>
+    <rosparam param="z_range">[-2.5, 2.0]</rosparam>
+    <param name="max_points_per_voxel" value="30"/>
+  </node>
+</launch>

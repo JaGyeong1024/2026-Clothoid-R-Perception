@@ -1,0 +1,25 @@
+# Frame Rate Architecture Notes
+
+
+## Key Ideas
+
+- Data-parallel architecture: 입력 프레임을 여러 CPU core에 round-robin 분산해 처리량을 높이는 구조.
+- Partial DNN acceleration: DNN 전체가 아니라 앞단 일부 layer만 GPU에 올려 CPU/GPU 활용률을 균형화하는 구조.
+- Jitter compensation: worst-case execution time 기준으로 cycle time 변동을 줄이는 구조.
+
+## Current Applicability
+
+- Livox classical pipeline에는 DNN layer가 없으므로 partial DNN acceleration은 직접 적용하지 않습니다.
+- Python multiprocessing 기반 data-parallel dispatch는 PointCloud2 IPC 비용과 tracker state reorder 문제가 있어 현 단계에서는 보류합니다.
+- Jitter compensation은 단일 callback 최적화와 rosbag 기반 p99 측정 이후에 판단합니다.
+
+## Later Decision Criteria
+
+실험장 rosbag 기준으로 다음 조건을 확인한 뒤 적용 여부를 정합니다.
+
+- 단일 callback p99가 센서 주기를 초과하는가
+- callback latency std/p99가 planning cycle에 실제 영향을 주는가
+- C++ 포팅 또는 safe vectorization 이후에도 처리량이 부족한가
+- DNN 노드에서 GPU 병목이 확인되는가
+
+현재 우선순위는 단일 프레임 처리 경로 최적화와 계측입니다.
