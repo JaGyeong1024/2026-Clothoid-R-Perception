@@ -47,13 +47,6 @@ PointCloud2 read (intensity 있으면 사용)
   → MarkerArray + BEV 이미지 발행
 ```
 
-## 리팩토링 todo (Phase 4)
-
-- [ ] `pc2_to_bev` 메서드를 `BevConverter` 클래스로 분리
-- [ ] OC-SORT 의존성을 vendor 또는 git submodule로 패키지에 포함 (현재 `/opt/OC_SORT` 외부 경로)
-- [ ] BEV 시각화(`vis` 그리기) 코드를 별도 메서드로 분리
-- [ ] CUDA fallback (CPU 환경 자동 감지)
-
 ## 모델 가중치
 
 `model/` 디렉토리에 `.pt` 파일 보관:

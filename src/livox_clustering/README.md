@@ -46,11 +46,3 @@ PointCloud2 read
   → 칼만 트래커 매칭/생성/소거
   → /perception/livox/centroids 발행
 ```
-
-## 리팩토링 todo (Phase 4)
-
-- [x] 모듈 함수형 → `LivoxEuclideanClustering` 클래스화
-- [x] 전역 `trackers`, `tid_seq` → 클래스 멤버
-- [x] 28개 하드코딩 상수 → `~private` ROS param + `config/livox_clustering.yaml`
-- [x] `pc_callback`(60줄, 8단계) → `_preprocess`, `_cluster`, `_track` 메서드 분리
-- [ ] `bare except` (현재 `except Exception`) → 구체적 예외 타입 명시

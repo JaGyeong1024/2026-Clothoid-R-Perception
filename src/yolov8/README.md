@@ -50,9 +50,3 @@ CompressedImage → cv2 decode
   → 클래스 0 bbox만 추출
   → detect_msgs/Yolo_Objects 발행
 ```
-
-## 리팩토링 todo (Phase 4)
-
-- [ ] 클래스 매핑(`class_names`)을 모델 yaml에서 읽도록 변경 (현재 코드에 중복 정의)
-- [ ] 시각화 코드(`cv2.rectangle`/`putText`)는 현재 주석처리됨 — 디버깅용 옵션 토픽으로 분리
-- [ ] 클래스 필터(`if cls_id != 0`)를 ROS param화 (`~allowed_classes: [0, 1, 2]`)

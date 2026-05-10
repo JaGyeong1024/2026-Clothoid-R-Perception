@@ -46,8 +46,3 @@ rviz -d $(rospack find perception_bringup)/rviz/perception.rviz
 ```
 
 > 현재 RViz config는 옛 토픽명(`/jagyeong`, `/minjae` 등) 기반일 수 있습니다. 새 토픽명에 맞게 업데이트 필요.
-
-## todo
-
-- [ ] RViz config를 새 토픽명(`/perception/...`)에 맞게 업데이트
-- [ ] Bag replay용 launch 추가 (sensor 입력을 bag 파일로 대체)

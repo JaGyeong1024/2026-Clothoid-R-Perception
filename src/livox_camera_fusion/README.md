@@ -46,11 +46,3 @@ LiDAR + Camera + YOLO 동기화
   → 칼만 추적 (전역 trackers)
   → /perception/fusion/centroids 발행
 ```
-
-## 리팩토링 todo (Phase 4)
-
-- [x] `convert_msg`(108줄)를 `_filter_points_in_bbox`, `_extract_roi`, `_cluster_and_centroid`로 분해
-- [ ] 전역 `trackers` / `next_tracker_id` → `KalmanTrackerManager` 클래스로 캡슐화
-- [x] `read_projection_matrix` 하드코딩 → `config/projection.yaml` 외부화
-- [ ] 시각화(opencv 그리기) 코드를 `Visualizer` 클래스로 분리
-- [ ] private 멤버 변수 trailing underscore 컨벤션 적용
