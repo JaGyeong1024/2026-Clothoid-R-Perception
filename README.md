@@ -43,16 +43,50 @@ Clothoid-R 자율주행 시스템의 Perception ROS workspace.
 
 - Ubuntu 20.04
 - ROS Noetic
-- Docker
-- `clothoid-noetic:latest` Docker image
+- Git
 - NVIDIA GPU/CUDA, optional
 
-## Docker Setup
+## Setup
 
-Docker image 확인:
+ROS environment:
 
 ```bash
-docker images | grep clothoid-noetic
+source /opt/ros/noetic/setup.bash
+```
+
+System packages:
+
+```bash
+sudo apt update
+sudo apt install -y \
+  wget \
+  git \
+  build-essential \
+  cmake \
+  python3-pip \
+  python3-rosdep \
+  ros-noetic-cv-bridge \
+  ros-noetic-pcl-ros \
+  ros-noetic-pcl-conversions \
+  ros-noetic-message-filters \
+  ros-noetic-dynamic-reconfigure \
+  ros-noetic-visualization-msgs
+```
+
+rosdep:
+
+```bash
+sudo rosdep init
+rosdep update
+```
+
+Miniconda:
+
+```bash
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh
+bash /tmp/miniconda.sh -b -p $HOME/anaconda3
+source $HOME/anaconda3/etc/profile.d/conda.sh
+conda init bash
 ```
 
 Repository clone:
@@ -62,79 +96,21 @@ git clone https://github.com/JaGyeong1024/2026-Clothoid-R-Perception.git
 cd 2026-Clothoid-R-Perception
 ```
 
-Perception image build:
+ROS dependency install:
 
 ```bash
-docker build \
-  -f docker/Dockerfile.perception \
-  -t clothoid-perception:latest \
-  .
+rosdep install --from-paths src --ignore-src -r -y
 ```
 
-Container 실행:
+Conda environment:
 
 ```bash
-docker run --rm -it \
-  --net=host \
-  --ipc=host \
-  --privileged \
-  --gpus all \
-  -v $(pwd):/ws \
-  -w /ws \
-  clothoid-perception:latest \
-  bash
-```
-
-GPU 옵션 미사용:
-
-```bash
-docker run --rm -it \
-  --net=host \
-  --ipc=host \
-  --privileged \
-  -v $(pwd):/ws \
-  -w /ws \
-  clothoid-perception:latest \
-  bash
-```
-
-Workspace build:
-
-```bash
-source /opt/ros/noetic/setup.bash
-catkin_make
-source devel/setup.bash
-```
-
-통합 실행:
-
-```bash
-roslaunch perception_bringup perception.launch \
-  conda_base:=/opt/miniforge3 \
-  conda_env:=clothoid
-```
-
-Velodyne BEV CPU 실행:
-
-```bash
-roslaunch perception_bringup perception.launch \
-  conda_base:=/opt/miniforge3 \
-  conda_env:=clothoid \
-  velodyne_device:=cpu
-```
-
-## Local Setup
-
-Ubuntu 20.04 + ROS Noetic 환경용.
-
-Conda environment 생성:
-
-```bash
+source $HOME/anaconda3/etc/profile.d/conda.sh
 conda env create -f environment.yml
 conda activate clothoid
 ```
 
-Custom YOLO package 설치:
+Custom YOLO package:
 
 ```bash
 cd yolov8_prune
@@ -142,7 +118,7 @@ pip install -e .
 cd ..
 ```
 
-OC-SORT 설치:
+OC-SORT:
 
 ```bash
 sudo git clone https://github.com/noahcao/OC_SORT /opt/OC_SORT
@@ -152,14 +128,42 @@ Workspace build:
 
 ```bash
 source /opt/ros/noetic/setup.bash
+source $HOME/anaconda3/etc/profile.d/conda.sh
+conda activate clothoid
 catkin_make
 source devel/setup.bash
 ```
 
-통합 실행:
+## Integrated Launch
+
+Default launch:
 
 ```bash
 roslaunch perception_bringup perception.launch
+```
+
+Custom conda path:
+
+```bash
+roslaunch perception_bringup perception.launch \
+  conda_base:=/opt/miniconda3 \
+  conda_env:=clothoid
+```
+
+Sensor topic override:
+
+```bash
+roslaunch perception_bringup perception.launch \
+  livox_lidar_topic:=/livox/lidar \
+  velodyne_points_topic:=/velodyne_points \
+  camera_image_topic:=/camera/image_raw/compressed
+```
+
+Velodyne BEV CPU mode:
+
+```bash
+roslaunch perception_bringup perception.launch \
+  velodyne_device:=cpu
 ```
 
 ## Launch Arguments
@@ -178,20 +182,9 @@ roslaunch perception_bringup perception.launch
 | `velodyne_device` | `cuda` |
 | `ocsort_path` | `/opt/OC_SORT` |
 
-Sensor topic override 예시:
-
-```bash
-roslaunch perception_bringup perception.launch \
-  conda_base:=/opt/miniforge3 \
-  conda_env:=clothoid \
-  livox_lidar_topic:=/livox/lidar \
-  velodyne_points_topic:=/velodyne_points \
-  camera_image_topic:=/camera/image_raw/compressed
-```
-
 ## Verification
 
-Node 확인:
+Node check:
 
 ```bash
 rosnode list
@@ -206,13 +199,13 @@ Expected nodes:
 /velodyne_bev_detection
 ```
 
-Topic 확인:
+Topic check:
 
 ```bash
 rostopic list | grep perception
 ```
 
-Output publisher 확인:
+Output publisher check:
 
 ```bash
 rostopic info /perception/livox/centroids
