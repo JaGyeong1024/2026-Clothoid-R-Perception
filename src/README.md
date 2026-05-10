@@ -8,9 +8,9 @@
 
 ## LiDAR와 카메라 융합 기반 객체 탐지 및 추적
 
-이 패키지는 yolov8에서 detect한 bbox와 Livox Lidar와 클러스터링을 통해 객체의 (x,y)를 pub을 한다.
+해당 패키지는 yolov8에서 detect한 bbox와 Livox Lidar와 클러스터링을 통해 객체의 (x,y)를 publish 함.
 
-### 파이프 라인은 다음과 같다
+### 파이프 라인
 
     ROS Topic 동기화(LiDAR+카메라+YOLO)
     ↓
