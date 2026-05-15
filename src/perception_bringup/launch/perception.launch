@@ -1,7 +1,14 @@
 <launch>
-  <!-- Conda env (Python perception nodes use launch-prefix) -->
-  <arg name="conda_base" default="$(env HOME)/anaconda3"/>
-  <arg name="conda_env"  default="clothoid"/>
+  <!--
+    livox_clustering / velodyne_detection은 launch-prefix로 conda env를 활성화한다.
+    yolov12 노드는 shebang(#!/home/cnu/anaconda3/envs/yolo/bin/python)이 conda env를 직접 호출하고,
+    LD_LIBRARY_PATH는 yolov12.launch의 <env> 태그가 노드 프로세스 한정으로 set한다.
+  -->
+  <arg name="conda_base"    default="$(env HOME)/anaconda3"/>
+  <arg name="conda_env"     default="clothoid"/>
+  <!-- yolov12 노드 프로세스에만 적용되는 conda env python/lib 경로 (다른 환경이면 override) -->
+  <arg name="python_interp" default="/home/cnu/anaconda3/envs/yolo/bin/python"/>
+  <arg name="conda_env_lib" default="/home/cnu/anaconda3/envs/yolo/lib"/>
 
   <!-- Sensor input topics -->
   <arg name="livox_lidar_topic"      default="/livox/lidar"/>
@@ -9,7 +16,7 @@
   <arg name="camera_image_topic"     default="/camera/image_raw/compressed"/>
 
   <!-- Perception interface topics -->
-  <arg name="camera_yolo_topic"      default="/perception/camera/yolo_objects"/>
+  <arg name="camera_yolo_topic"      default="/perception/camera/yolo"/>
   <arg name="livox_centroid_topic"   default="/perception/livox/centroids"/>
   <arg name="fusion_centroid_topic"  default="/perception/fusion/centroids"/>
   <arg name="velodyne_centroid_topic" default="/perception/velodyne/centroids"/>
@@ -20,11 +27,11 @@
   <arg name="fusion_projection_config" default="$(find livox_camera_fusion)/config/projection.yaml"/>
   <arg name="livox_clustering_config" default="$(find livox_clustering)/config/livox_clustering.yaml"/>
 
-  <include file="$(find yolov8)/launch/yolov8.launch">
-    <arg name="conda_base" value="$(arg conda_base)"/>
-    <arg name="conda_env"  value="$(arg conda_env)"/>
-    <arg name="source_topic" value="$(arg camera_image_topic)"/>
-    <arg name="output_topic" value="$(arg camera_yolo_topic)"/>
+  <include file="$(find yolov12)/launch/yolov12.launch">
+    <arg name="source_topic"  value="$(arg camera_image_topic)"/>
+    <arg name="output_topic"  value="$(arg camera_yolo_topic)"/>
+    <arg name="python_interp" value="$(arg python_interp)"/>
+    <arg name="conda_env_lib" value="$(arg conda_env_lib)"/>
   </include>
 
   <include file="$(find livox_camera_fusion)/launch/livox_camera_fusion.launch">

@@ -63,7 +63,7 @@ LivoxCameraFusion::LivoxCameraFusion(ros::NodeHandle *nodeHandle)
 {
     nh.param("lidar_topic",          lidar_topic,          std::string("/livox/lidar"));
     nh.param("camera_topic",         camera_topic,         std::string("/camera/image_raw/compressed"));
-    nh.param("yolo_topic",           yolo_topic,           std::string("/perception/camera/yolo_objects"));
+    nh.param("yolo_topic",           yolo_topic,           std::string("/perception/camera/yolo"));
     nh.param("centroid_topic",       centroid_topic,       std::string("/perception/fusion/centroids"));
     nh.param("filtered_cloud_topic", filtered_cloud_topic, std::string("/perception/fusion/filtered_cloud"));
     nh.param("frame_name",           frame_name,           std::string("livox_frame"));

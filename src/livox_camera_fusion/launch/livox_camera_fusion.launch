@@ -1,7 +1,7 @@
 <launch>
   <arg name="lidar_topic"  default="/livox/lidar"/>
   <arg name="camera_topic" default="/camera/image_raw/compressed"/>
-  <arg name="yolo_topic"   default="/perception/camera/yolo_objects"/>
+  <arg name="yolo_topic"   default="/perception/camera/yolo"/>
   <arg name="centroid_topic" default="/perception/fusion/centroids"/>
   <arg name="filtered_cloud_topic" default="/perception/fusion/filtered_cloud"/>
   <arg name="frame_name"   default="livox_frame"/>

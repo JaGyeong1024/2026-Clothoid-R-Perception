@@ -12,5 +12,5 @@
   <exec_depend>livox_camera_fusion</exec_depend>
   <exec_depend>livox_clustering</exec_depend>
   <exec_depend>velodyne_detection</exec_depend>
-  <exec_depend>yolov8</exec_depend>
+  <exec_depend>yolov12</exec_depend>
 </package>

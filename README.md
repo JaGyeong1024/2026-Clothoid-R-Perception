@@ -18,7 +18,7 @@ Clothoid-R 자율주행 시스템의 Perception ROS workspace.
 | Pipeline | Input | Output | Package |
 |---|---|---|---|
 | Livox clustering | `/livox/lidar` | `/perception/livox/centroids` | `livox_clustering` |
-| Livox-camera fusion | `/livox/lidar`, `/camera/image_raw/compressed`, `/perception/camera/yolo_objects` | `/perception/fusion/centroids` | `livox_camera_fusion` |
+| Livox-camera fusion | `/livox/lidar`, `/camera/image_raw/compressed`, `/perception/camera/yolo` | `/perception/fusion/centroids` | `livox_camera_fusion` |
 | Velodyne BEV detection | `/velodyne_points` | `/perception/velodyne/centroids` | `velodyne_detection` |
 
 ## Packages
@@ -27,7 +27,7 @@ Clothoid-R 자율주행 시스템의 Perception ROS workspace.
 |---|---|
 | `perception_bringup` | 통합 launch |
 | `detect_msgs` | 공통 perception message |
-| `yolov8` | Camera YOLO detection |
+| `yolov12` | Camera YOLO detection |
 | `livox_clustering` | Livox point cloud clustering and tracking |
 | `livox_camera_fusion` | Livox-camera YOLO fusion |
 | `velodyne_detection` | Velodyne BEV YOLO detection and OC-SORT tracking |
@@ -111,13 +111,18 @@ conda env create -f environment.yml
 conda activate clothoid
 ```
 
-Custom YOLO package:
+YOLOv12 env (담당자 셋업 기준 — 타겟 PC `cnu`):
 
-```bash
-cd yolov8_prune
-pip install -e .
-cd ..
-```
+`yolov12` 노드는 conda env(`/home/cnu/anaconda3/envs/yolo`)가 미리 세팅돼 있다고 전제합니다. launch가 처리하는 격리:
+
+- `launch-prefix="$(arg python_interp)"` — 노드 인터프리터를 conda env python으로 강제 (catkin wrapper의 시스템 python shebang을 우회)
+- `<env name="LD_LIBRARY_PATH" .../>` — LD_LIBRARY_PATH를 노드 프로세스에만 set (부모 셸/다른 노드/이미지 전역 무영향)
+
+타겟 env에 필요한 것:
+- yolov12 지원 ultralytics fork (담당자 PC `/home/cnu/clothoid-r/perception_ws/yolov12`)
+- `torch`, `numpy`, `opencv-python`, `rospkg`
+
+다른 환경에서 동작시키려면 `python_interp` / `conda_env_lib` 인자 override. 자세한 가이드는 `src/yolov12/README.md` 참고.
 
 OC-SORT:
 
@@ -137,10 +142,20 @@ source devel/setup.bash
 
 ## Integrated Launch
 
+yolov12 노드의 `LD_LIBRARY_PATH`는 `yolov12.launch`의 `<env>` 태그가 그 노드 프로세스에만 set하므로 별도 export가 필요 없습니다. 부모 셸/이미지 전역 환경 무영향.
+
 Default launch:
 
 ```bash
 roslaunch perception_bringup perception.launch
+```
+
+다른 환경(다른 PC, 도커 등)이면 yolov12 conda env의 python/lib 경로를 override:
+
+```bash
+roslaunch perception_bringup perception.launch \
+  python_interp:=$HOME/anaconda3/envs/yolo/bin/python \
+  conda_env_lib:=$HOME/anaconda3/envs/yolo/lib
 ```
 
 Custom conda path:
@@ -176,7 +191,7 @@ roslaunch perception_bringup perception.launch \
 | `livox_lidar_topic` | `/livox/lidar` |
 | `velodyne_points_topic` | `/velodyne_points` |
 | `camera_image_topic` | `/camera/image_raw/compressed` |
-| `camera_yolo_topic` | `/perception/camera/yolo_objects` |
+| `camera_yolo_topic` | `/perception/camera/yolo` |
 | `livox_centroid_topic` | `/perception/livox/centroids` |
 | `fusion_centroid_topic` | `/perception/fusion/centroids` |
 | `velodyne_centroid_topic` | `/perception/velodyne/centroids` |
@@ -194,7 +209,7 @@ rosnode list
 Expected nodes:
 
 ```text
-/camera_yolo_detection
+/yolo_detect_node
 /livox_camera_fusion
 /livox_euclidean_clustering
 /velodyne_bev_detection

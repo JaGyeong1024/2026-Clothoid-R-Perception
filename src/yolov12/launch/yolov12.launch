@@ -1,0 +1,40 @@
+<launch>
+  <!--
+    yolov12 노드 격리 메커니즘:
+    1) shebang(`#!/home/cnu/anaconda3/envs/yolo/bin/python`)은 담당자 의도 표현용으로 유지.
+       다만 catkin_install_python이 devel/lib에 wrapper를 만들어 shebang을 우회하므로
+       실제 인터프리터는 아래 launch-prefix가 강제 지정한다.
+    2) launch-prefix가 conda env python을 노드 인터프리터로 결정한다.
+    3) LD_LIBRARY_PATH는 <env> 태그가 이 노드 프로세스 한정으로 set한다(전역 무영향).
+    - 절대로 ~/.bashrc 등에 LD_LIBRARY_PATH를 전역 등록하지 말 것.
+    환경이 다르면 python_interp / conda_env_lib 인자로 override.
+  -->
+
+  <!-- yolov12 conda env의 python 인터프리터 & lib 경로 (담당자 PC 기준 default) -->
+  <arg name="python_interp" default="/home/cnu/anaconda3/envs/yolo/bin/python"/>
+  <arg name="conda_env_lib" default="/home/cnu/anaconda3/envs/yolo/lib"/>
+
+  <!-- I/O -->
+  <arg name="source_topic"  default="/camera/image_raw/compressed"/>
+  <arg name="output_topic"  default="/perception/camera/yolo"/>
+  <arg name="confidence"    default="0.4"/>
+  <arg name="frame_id"      default="camera_link"/>
+  <arg name="ultralytics_path" default=""/>
+  <arg name="show_detection_image" default="false"/>
+
+  <node pkg="yolov12"
+        type="yolo_detect.py"
+        name="yolo_detect_node"
+        output="screen"
+        launch-prefix="$(arg python_interp)">
+    <env name="LD_LIBRARY_PATH" value="$(arg conda_env_lib):/opt/ros/noetic/lib"/>
+    <param name="source"           value="$(arg source_topic)"/>
+    <param name="output_topic"     value="$(arg output_topic)"/>
+    <param name="yaml_cfg"         value="$(find yolov12)/models/prune_0510.yaml"/>
+    <param name="pt_weights"       value="$(find yolov12)/models/prune_0510.pt"/>
+    <param name="confidence"       value="$(arg confidence)"/>
+    <param name="frame_id"         value="$(arg frame_id)"/>
+    <param name="ultralytics_path" value="$(arg ultralytics_path)"/>
+    <param name="show_detection_image" value="$(arg show_detection_image)"/>
+  </node>
+</launch>
