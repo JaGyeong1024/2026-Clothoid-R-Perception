@@ -9,11 +9,17 @@
   <arg name="frame_id"           default="livox_frame"/>
   <arg name="config"             default="$(find livox_clustering)/config/livox_clustering.yaml"/>
 
+  <!--
+    launch-prefix is the conda env's python interpreter path. We invoke the
+    catkin-generated wrapper script as an argument to that interpreter, which
+    bypasses the wrapper's `#!/usr/bin/python3` shebang. (`conda activate`
+    alone does not — Linux honors the shebang on exec regardless of PATH.)
+  -->
   <node pkg="livox_clustering"
         type="livox_euclidean_clustering.py"
         name="livox_euclidean_clustering"
         output="screen"
-        launch-prefix="bash -c 'source $(arg conda_base)/etc/profile.d/conda.sh &amp;&amp; conda activate $(arg conda_env) &amp;&amp; exec $0 $*'">
+        launch-prefix="$(arg conda_base)/envs/$(arg conda_env)/bin/python">
     <rosparam command="load" file="$(arg config)"/>
     <param name="input_topic"        value="$(arg input_topic)"/>
     <param name="centroid_topic"     value="$(arg centroid_topic)"/>

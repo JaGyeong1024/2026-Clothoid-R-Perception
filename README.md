@@ -122,9 +122,9 @@ YOLO env (담당자 셋업 기준 — 타겟 PC `cnu`):
 
 `yolov12` 노드는 shebang(`#!/home/cnu/anaconda3/envs/yolo/bin/python`)으로 conda env를 직접 호출합니다. 이 env에 다음이 깔려 있어야 함:
 - yolov12 지원 ultralytics fork (담당자 PC `/home/cnu/clothoid-r/perception_ws/yolov12`)
-- `torch`, `numpy`, `opencv-python`, `rospkg`
+- `torch`, `numpy`, `opencv-python`, `rospkg`, `thop` — `yolo-requirements.txt` 참조
 
-`yolov8` 노드는 system python(`/usr/bin/env python3`) shebang. ultralytics가 시스템 pip로 설치돼 있어야 함.
+`velodyne_detection`은 자체적으로 `ultralytics`(clothoid env에 포함)로 YOLO 추론하므로 별도 노드 불필요.
 
 OC-SORT:
 
@@ -144,19 +144,16 @@ source devel/setup.bash
 
 ## Run
 
-YOLO 노드는 환경 격리 문제로 bringup launch에서 빼고 `rosrun`으로 따로 띄웁니다.
-
 Bringup (fusion + livox_clustering + velodyne_detection):
 
 ```bash
 roslaunch perception_bringup perception.launch
 ```
 
-YOLO 노드 (별도 터미널):
+카메라 YOLO 노드는 환경 격리 문제로 분리, 별도 터미널에서:
 
 ```bash
-rosrun yolov12 yolo_detect.py   # fusion이 구독하는 카메라 YOLO
-rosrun yolov8  yolo_detect.py   # velodyne_detection이 쓰는 YOLO
+rosrun yolov12 yolo_detect.py   # fusion 입력 (yolo conda env, shebang으로 진입)
 ```
 
 Custom conda path:

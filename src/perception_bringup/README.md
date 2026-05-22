@@ -8,7 +8,7 @@ Perception 스택의 통합 launch와 RViz 설정을 모은 메타 패키지.
 roslaunch perception_bringup perception.launch
 ```
 
-이 launch는 다음 3개 노드만 띄움. YOLO 노드(yolov12, yolov8)는 환경 격리 문제로 통합에서 빼고 `rosrun`으로 별도 실행한다.
+이 launch는 다음 3개 노드만 띄움. 카메라 YOLO(yolov12)는 conda env 격리 때문에 통합에서 빼고 `rosrun`으로 별도 실행한다.
 
 | 노드 | 패키지 | env 처리 |
 |---|---|---|
@@ -16,11 +16,10 @@ roslaunch perception_bringup perception.launch
 | `livox_euclidean_clustering` | livox_clustering | 격리 (launch-prefix로 `conda_env` 활성화) |
 | `velodyne_bev_detection` | velodyne_detection | 격리 (launch-prefix로 `conda_env` 활성화) |
 
-YOLO 노드는 별도 터미널에서:
+카메라 YOLO 노드는 별도 터미널에서:
 
 ```bash
-rosrun yolov12 yolo_detect.py   # fusion이 구독하는 카메라 YOLO
-rosrun yolov8  yolo_detect.py   # velodyne_detection이 쓰는 YOLO
+rosrun yolov12 yolo_detect.py   # fusion 입력 (yolo conda env, shebang으로 진입)
 ```
 
 ## Launch arguments

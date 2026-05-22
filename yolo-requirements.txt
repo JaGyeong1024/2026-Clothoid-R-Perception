@@ -27,5 +27,8 @@ safetensors==0.4.3
 numpy==1.26.4
 supervision==0.22.0
 
+# Hard import inside yolov12 fork's ultralytics/utils/torch_utils.py.
+thop==0.1.1.post2209072238
+
 # ROS rospy import in yolo_detect.py.
 rospkg

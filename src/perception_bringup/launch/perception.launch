@@ -1,7 +1,7 @@
 <launch>
   <!--
     livox_clustering / velodyne_detection은 launch-prefix로 conda env를 활성화한다.
-    YOLO 노드(yolov12, yolov8)는 이 launch에 포함되지 않는다 — rosrun으로 별도 실행.
+    카메라 YOLO(yolov12)는 이 launch에 포함되지 않는다 — rosrun으로 별도 실행.
   -->
   <arg name="conda_base"    default="$(env HOME)/anaconda3"/>
   <arg name="conda_env"     default="clothoid"/>
