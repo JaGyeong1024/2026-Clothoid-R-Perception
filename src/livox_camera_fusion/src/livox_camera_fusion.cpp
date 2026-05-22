@@ -189,15 +189,19 @@ void LivoxCameraFusion::collect_points_in_bbox(
 {
     for (size_t i = 0; i < projected_list.size(); ++i)
     {
+        const auto &lp = lidar_points[i];
+        // 3D ROI: bbox에 같이 끌려온 먼 거리 배경 포인트 컷
+        if (lp.x < FUSION_ROI_X_MIN || lp.x > FUSION_ROI_X_MAX ||
+            lp.y < FUSION_ROI_Y_MIN || lp.y > FUSION_ROI_Y_MAX ||
+            lp.z < FUSION_ROI_Z_MIN || lp.z > FUSION_ROI_Z_MAX)
+            continue;
         double u = projected_list[i].x, v = projected_list[i].y;
         if (std::isnan(u) || std::isnan(v))
             continue;
         if (u >= box.x1 && u <= box.x2 && v >= box.y1 && v <= box.y2)
         {
             matched_px.emplace_back(u, v);
-            local->points.emplace_back(lidar_points[i].x,
-                                       lidar_points[i].y,
-                                       lidar_points[i].z);
+            local->points.emplace_back(lp.x, lp.y, lp.z);
         }
     }
 }

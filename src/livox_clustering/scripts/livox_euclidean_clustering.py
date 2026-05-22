@@ -9,7 +9,8 @@ import rospy, time, numpy as np
 from sensor_msgs.msg import PointCloud2, PointCloud
 from sensor_msgs.msg import PointField
 import sensor_msgs.point_cloud2 as pc2
-from geometry_msgs.msg import Point32
+from geometry_msgs.msg import Point32, Point
+from visualization_msgs.msg import Marker
 from scipy.spatial import cKDTree
 from sklearn.linear_model import RANSACRegressor
 import std_msgs.msg
@@ -250,10 +251,47 @@ class LivoxEuclideanClustering:
 
         self.pre_pub = rospy.Publisher(self.preprocessed_topic, PointCloud2, queue_size=1)
         self.cent_pub = rospy.Publisher(self.centroid_topic, PointCloud, queue_size=1)
+        self.roi_pub = rospy.Publisher("/perception/livox/roi_marker", Marker, queue_size=1, latch=True)
         rospy.Subscriber(self.input_topic, PointCloud2, self.pc_callback, queue_size=1)
 
+        self.publish_roi_marker()
         rospy.loginfo(f"[livox_euclidean_clustering] subscribe={self.input_topic} "
                       f"-> centroid={self.centroid_topic}, preprocessed={self.preprocessed_topic}")
+
+    def publish_roi_marker(self):
+        """ROI 박스를 LINE_LIST Marker로 1회 publish (latched). 파라미터 reload 시 다시 호출."""
+        m = Marker()
+        m.header.stamp = rospy.Time.now()
+        m.header.frame_id = self.frame_id
+        m.ns = "livox_roi"
+        m.id = 0
+        m.type = Marker.LINE_LIST
+        m.action = Marker.ADD
+        m.scale.x = 0.05
+        m.color.r, m.color.g, m.color.b, m.color.a = 0.0, 1.0, 1.0, 0.9  # cyan
+        m.pose.orientation.w = 1.0
+        m.lifetime = rospy.Duration(0)
+        rx, ry, rz = (ROI_X_MIN, ROI_X_MAX), (ROI_Y_MIN, ROI_Y_MAX), (ROI_Z_MIN, ROI_Z_MAX)
+        corners = [(x, y, z) for x in rx for y in ry for z in rz]  # idx = xi*4 + yi*2 + zi
+        pts = []
+        for xi in (0, 1):
+            for yi in (0, 1):
+                for zi in (0, 1):
+                    i = xi*4 + yi*2 + zi
+                    if xi == 0:
+                        a, b = i, i + 4
+                        for k in (a, b):
+                            x, y, z = corners[k]; pts.append(Point(x=x, y=y, z=z))
+                    if yi == 0:
+                        a, b = i, i + 2
+                        for k in (a, b):
+                            x, y, z = corners[k]; pts.append(Point(x=x, y=y, z=z))
+                    if zi == 0:
+                        a, b = i, i + 1
+                        for k in (a, b):
+                            x, y, z = corners[k]; pts.append(Point(x=x, y=y, z=z))
+        m.points = pts
+        self.roi_pub.publish(m)
 
     def publish_preprocessed(self, pts):
         hdr = std_msgs.msg.Header(stamp=rospy.Time.now(), frame_id=self.frame_id)

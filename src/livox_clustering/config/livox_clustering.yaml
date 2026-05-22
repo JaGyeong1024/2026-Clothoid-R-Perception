@@ -1,4 +1,4 @@
-pitch_deg: 0.1
+pitch_deg: 0.33
 
 roi_x_min: 0.0
 roi_x_max: 12.0
@@ -9,25 +9,25 @@ roi_z_max: 1.5
 voxel_size: 0.1
 
 dror_min_neighbors: 3
-dror_min_radius: 0.1
-dror_radius_scale: 0.1
-dror_max_radius: 0.2
+dror_min_radius: 0.05
+dror_radius_scale: 0.015
+dror_max_radius: 0.3
 
 grid_cell_size: 0.2
 grid_max_height_diff: 0.2
-grid_min_points: 10
-ground_thresh: 0.3
+grid_min_points: 5
+ground_thresh: 0.25
 
-euclidean_min_cluster_size: 5
+euclidean_min_cluster_size: 3
 cluster_merge_gap: 0.5
 max_length: 2.5
 max_width: 2.5
-max_height: 1.0
-min_length: 0.5
-min_width: 0.5
-min_height: 0.3
-euclidean_base_dist: 0.05
-euclidean_dist_scale: 0.05
+max_height: 0.8
+min_length: 0.3
+min_width: 0.3
+min_height: 0.2
+euclidean_base_dist: 0.1
+euclidean_dist_scale: 0.01
 
 tracker_max_miss: 5
-match_dist: 1.5
+match_dist: 0.8

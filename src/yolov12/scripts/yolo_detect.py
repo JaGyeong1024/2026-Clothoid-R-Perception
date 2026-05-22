@@ -14,7 +14,7 @@ from ultralytics import YOLO
 
 # 사용자가 자주 바꿀 수 있는 설정값 모음
 # True 이면 검출 결과 영상을 화면에 띄우고, False 이면 화면 출력 없이 ROS 토픽만 publish 합니다.
-SHOW_DETECTION_IMAGE = True
+SHOW_DETECTION_IMAGE = False
 
 # True 이면 검출 결과 로그 영역만 갱신해서 현재 상태만 깔끔하게 보여줍니다.
 # 초기화 로그(MODEL LOADED, yaml_cfg, pt_weights 등)는 그대로 유지됩니다.

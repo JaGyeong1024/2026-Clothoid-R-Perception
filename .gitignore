@@ -65,6 +65,13 @@ Dockerfile
 .dockerignore
 docker_perception.sh
 
+# ===== Local-only dev tools (정식 calibration/통합 후 교체) =====
+src/perception_bringup/launch/tf_static.launch
+src/perception_bringup/scripts/merge_centroids.py
+test.sh
+0522.rviz
+IMPROVEMENTS.md
+
 # ===== draw.io / seminar assets =====
 *.drawio
 2026_pipeline.png

@@ -42,6 +42,16 @@ roslaunch perception_bringup perception.launch \
   conda_base:=/opt/miniconda3 conda_env:=my_env
 ```
 
+## 로컬 RViz용 정적 TF (placeholder)
+
+`livox_frame`과 `velodyne` 두 프레임만으로는 RViz가 둘을 한 화면에 정합 못 함. 임시로 정적 TF 발행하는 launch:
+
+```bash
+roslaunch perception_bringup tf_static.launch
+```
+
+Fixed Frame은 `ego_vehicle`로 설정. 값은 Clothoid-R URDF에서 가져온 placeholder — 정식 calibration 후 robot_state_publisher + URDF로 교체 권장. bringup launch에는 의도적으로 포함하지 않았음.
+
 ## RViz 설정
 
 `rviz/perception.rviz` — 디버깅 토픽(전처리 클라우드, BEV 이미지, marker 등)을 표시하는 사전 구성 RViz 레이아웃.

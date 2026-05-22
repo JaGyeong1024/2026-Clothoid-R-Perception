@@ -33,12 +33,22 @@
 static constexpr double BBOX_SCALE_RATIO = 0.8;
 static constexpr double GROUND_THRESH = 0.0;
 static constexpr double CLUSTER_TOLERANCE = 0.4;
-static constexpr int CLUSTER_MIN_SIZE = 0;
+static constexpr int CLUSTER_MIN_SIZE = 3;
 static constexpr int CLUSTER_MAX_SIZE = 100;
 static constexpr double ROI_RADIUS_PX = 10.0;
 static constexpr double MATCH_DIST = 7.0;
 static constexpr int TRACKER_MAX_MISS = 15;
 static constexpr int MIN_BBOX_EDGE_PX = 0;
+
+/* 3D ROI (livox_frame, m).
+   bbox 안에 투영된 점 중 이 박스 밖에 있는 것은 버림.
+   먼 거리 배경이 bbox로 끌려와 fake centroid 만드는 문제 방지용. */
+static constexpr double FUSION_ROI_X_MIN = 0.0;
+static constexpr double FUSION_ROI_X_MAX = 12.0;
+static constexpr double FUSION_ROI_Y_MIN = -4.0;
+static constexpr double FUSION_ROI_Y_MAX = 4.0;
+static constexpr double FUSION_ROI_Z_MIN = -2.0;
+static constexpr double FUSION_ROI_Z_MAX = 2.0;
 
 /* ===== Kalman Tracker ===== */
 struct KalmanTracker
