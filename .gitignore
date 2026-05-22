@@ -1,0 +1,76 @@
+# ===== catkin / ROS build artifacts =====
+build/
+devel/
+install/
+log/
+logs/
+.catkin_tools/
+*.bag
+*.bag.active
+*_bag/
+bag/
+bags/
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+.eggs/
+.Python
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+.venv/
+venv/
+env/
+
+# ===== C/C++ build artifacts =====
+*.o
+*.obj
+*.a
+*.lib
+*.dll
+*.dylib
+*.exe
+*.out
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+compile_commands.json
+
+# ===== Editors / IDEs =====
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ===== AI agents / assistants =====
+.claude/
+.codex/
+.agents/
+.cursor/
+.aider*
+.continue/
+
+# ===== Docker (local-only env mirroring vehicle PC) =====
+Dockerfile
+.dockerignore
+docker_perception.sh
+
+# ===== draw.io / seminar assets =====
+*.drawio
+2026_pipeline.png
+
+# ===== Misc =====
+*.log
+*.tmp
+*.bak
+core

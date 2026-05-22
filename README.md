@@ -118,18 +118,13 @@ conda env create -f environment.yml
 conda activate clothoid
 ```
 
-YOLOv12 env (담당자 셋업 기준 — 타겟 PC `cnu`):
+YOLO env (담당자 셋업 기준 — 타겟 PC `cnu`):
 
-`yolov12` 노드는 conda env(`/home/cnu/anaconda3/envs/yolo`)가 미리 세팅돼 있다고 전제합니다. launch가 처리하는 격리:
-
-- `launch-prefix="$(arg python_interp)"` — 노드 인터프리터를 conda env python으로 강제 (catkin wrapper의 시스템 python shebang을 우회)
-- `<env name="LD_LIBRARY_PATH" .../>` — LD_LIBRARY_PATH를 노드 프로세스에만 set (부모 셸/다른 노드/이미지 전역 무영향)
-
-타겟 env에 필요한 것:
+`yolov12` 노드는 shebang(`#!/home/cnu/anaconda3/envs/yolo/bin/python`)으로 conda env를 직접 호출합니다. 이 env에 다음이 깔려 있어야 함:
 - yolov12 지원 ultralytics fork (담당자 PC `/home/cnu/clothoid-r/perception_ws/yolov12`)
 - `torch`, `numpy`, `opencv-python`, `rospkg`
 
-다른 환경에서 동작시키려면 `python_interp` / `conda_env_lib` 인자 override. 자세한 가이드는 `src/yolov12/README.md` 참고.
+`yolov8` 노드는 system python(`/usr/bin/env python3`) shebang. ultralytics가 시스템 pip로 설치돼 있어야 함.
 
 OC-SORT:
 
@@ -147,22 +142,21 @@ catkin_make
 source devel/setup.bash
 ```
 
-## Integrated Launch
+## Run
 
-yolov12 노드의 `LD_LIBRARY_PATH`는 `yolov12.launch`의 `<env>` 태그가 그 노드 프로세스에만 set하므로 별도 export가 필요 없습니다. 부모 셸/이미지 전역 환경 무영향.
+YOLO 노드는 환경 격리 문제로 bringup launch에서 빼고 `rosrun`으로 따로 띄웁니다.
 
-Default launch:
+Bringup (fusion + livox_clustering + velodyne_detection):
 
 ```bash
 roslaunch perception_bringup perception.launch
 ```
 
-다른 환경(다른 PC, 도커 등)이면 yolov12 conda env의 python/lib 경로를 override:
+YOLO 노드 (별도 터미널):
 
 ```bash
-roslaunch perception_bringup perception.launch \
-  python_interp:=$HOME/anaconda3/envs/yolo/bin/python \
-  conda_env_lib:=$HOME/anaconda3/envs/yolo/lib
+rosrun yolov12 yolo_detect.py   # fusion이 구독하는 카메라 YOLO
+rosrun yolov8  yolo_detect.py   # velodyne_detection이 쓰는 YOLO
 ```
 
 Custom conda path:

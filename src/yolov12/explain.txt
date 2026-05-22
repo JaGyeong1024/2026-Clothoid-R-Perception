@@ -1,0 +1,2 @@
+LD_LIBRARY_PATH=/home/cnu/anaconda3/envs/yolo/lib:/opt/ros/noetic/lib
+roslaunch yolov12 yolo_detect.launch

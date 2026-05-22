@@ -90,7 +90,7 @@ class VelodyneBevDetection:
         from trackers.ocsort_tracker.ocsort import OCSort
 
         # Model
-        model_path = rospy.get_param("~model_path", "")
+        model_path = rospy.get_param("~model_path", "/home/cnu/clothoid-r/perception_ws/src/velodyne_detection/model/velodyne_v6.pt")
         if not model_path:
             rospy.logerr("[velodyne_bev_detection] ~model_path not set")
             raise RuntimeError("~model_path is required")

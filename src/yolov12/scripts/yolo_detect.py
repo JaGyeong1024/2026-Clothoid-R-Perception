@@ -1,12 +1,6 @@
 #!/home/cnu/anaconda3/envs/yolo/bin/python
-# shebang은 타겟 PC(cnu)에 미리 세팅된 conda env(yolo)의 python을 직접 호출한다.
-# 다른 환경에서 실행하려면 이 경로의 conda env(또는 동일한 site-packages를 가진 env)가
-# 존재해야 한다. launch에서 별도 conda activate 처리는 하지 않는다.
-import logging
 import os
 import sys
-import warnings
-from pathlib import Path
 
 import cv2
 import numpy as np
@@ -15,59 +9,89 @@ from detect_msgs.msg import Objects, Yolo_Objects
 from sensor_msgs.msg import CompressedImage
 from std_msgs.msg import Header
 
-logging.getLogger("ultralytics").setLevel(logging.ERROR)
-warnings.filterwarnings("ignore", category=UserWarning)
+sys.path.insert(0, "/home/cnu/clothoid-r/perception_ws/yolov12")
+from ultralytics import YOLO
 
+# 사용자가 자주 바꿀 수 있는 설정값 모음
+# True 이면 검출 결과 영상을 화면에 띄우고, False 이면 화면 출력 없이 ROS 토픽만 publish 합니다.
+SHOW_DETECTION_IMAGE = True
+
+# True 이면 검출 결과 로그 영역만 갱신해서 현재 상태만 깔끔하게 보여줍니다.
+# 초기화 로그(MODEL LOADED, yaml_cfg, pt_weights 등)는 그대로 유지됩니다.
+CLEAR_TERMINAL_ON_DETECTION = True
+
+WINDOW_NAME = "YOLOv12 BBox"
+DEFAULT_SOURCE_TOPIC = "/camera/image_raw/compressed"
+DEFAULT_PUBLISH_TOPIC = "/perception/camera/yolo"
+DEFAULT_CONFIDENCE = 0.5
+DEFAULT_FRAME_ID = "camera_link"
+PACKAGE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+DEFAULT_YAML_CFG = os.path.join(PACKAGE_DIR, "models", "0516_prune.yaml")
+DEFAULT_PT_WEIGHTS = os.path.join(PACKAGE_DIR, "models", "0516_prune.pt")
+# publish할 클래스 목록을 여기에서 직접 설정합니다.
+# 0: ERP-42
+# 1: drum
+# 2: cone
+# 예시: [0, 1, 2] 모두 publish, [0] ERP-42만 publish, [0, 2] ERP-42와 cone만 publish
+DEFAULT_PUBLISH_CLASSES = [0, 1, 2]
 CLASS_NAMES = {
     0: "ERP-42",
     1: "drum",
     2: "cone",
 }
 
-
 class YoloDetectNode:
     def __init__(self):
         rospy.init_node("yolo_detect_node")
 
-        # ultralytics(yolov12 fork) import 경로. launch에서 ~ultralytics_path 또는
-        # YOLOV12_PATH 환경변수로 외부 yolov12 소스 디렉토리를 지정할 수 있다.
-        extra_path = rospy.get_param("~ultralytics_path", os.environ.get("YOLOV12_PATH", ""))
-        if extra_path and extra_path not in sys.path:
-            sys.path.insert(0, extra_path)
-        from ultralytics import YOLO
+        self.win_name = WINDOW_NAME
+        self.class_names = CLASS_NAMES
+        self.previous_status_line_count = 0
+        source_topic = rospy.get_param("~source", DEFAULT_SOURCE_TOPIC)
+        publish_topic = rospy.get_param("~output_topic", DEFAULT_PUBLISH_TOPIC)
+        yaml_cfg = rospy.get_param("~yaml_cfg", DEFAULT_YAML_CFG)
+        pt_weights = rospy.get_param("~pt_weights", DEFAULT_PT_WEIGHTS)
+        self.conf_thres = rospy.get_param("~confidence", DEFAULT_CONFIDENCE)
+        self.frame_id = rospy.get_param("~frame_id", DEFAULT_FRAME_ID)
+        self.publish_classes = set(int(class_id) for class_id in DEFAULT_PUBLISH_CLASSES)
 
-        package_dir = Path(__file__).resolve().parents[1]
-        default_yaml = package_dir / "models" / "prune_0510.yaml"
-        default_pt = package_dir / "models" / "prune_0510.pt"
+        self.pub = rospy.Publisher(publish_topic, Yolo_Objects, queue_size=1)
 
-        source_topic = rospy.get_param("~source", "/camera/image_raw/compressed")
-        output_topic = rospy.get_param("~output_topic", "/perception/camera/yolo")
-        yaml_cfg = rospy.get_param("~yaml_cfg", str(default_yaml))
-        pt_weights = rospy.get_param("~pt_weights", str(default_pt))
-        self.conf_thres = rospy.get_param("~confidence", 0.4)
-        self.frame_id = rospy.get_param("~frame_id", "camera_link")
-        # publish할 클래스 ID 리스트. 빈 리스트면 전부 publish.
-        # 0: ERP-42, 1: drum, 2: cone
-        publish_classes = rospy.get_param("~publish_classes", [0, 1, 2])
-        self.publish_classes = set(int(c) for c in publish_classes)
-        self.show_detection_image = rospy.get_param("~show_detection_image", False)
-        self.win_name = rospy.get_param("~window_name", "YOLOv12 BBox")
-
-        self.pub = rospy.Publisher(output_topic, Yolo_Objects, queue_size=1)
-        self.model = YOLO(yaml_cfg, task="detect").load(pt_weights)
-        rospy.loginfo(f"[yolo_detect_node] YOLOv12 model loaded: {yaml_cfg}, {pt_weights}")
+        self.model = YOLO(yaml_cfg, task='detect').load(pt_weights)
+        rospy.loginfo(f"[yolo_detect_node] YOLOv12 MODEL LOADED")
+        rospy.loginfo(f"[yolo_detect_node] yaml_cfg: {yaml_cfg}")
+        rospy.loginfo(f"[yolo_detect_node] pt_weights: {pt_weights}")
+        rospy.loginfo(f"[yolo_detect_node] frame_id: {self.frame_id}")
         rospy.loginfo(
-            f"[yolo_detect_node] publish_classes={sorted(self.publish_classes) if self.publish_classes else 'ALL'}"
+            f"[yolo_detect_node] publish_classes: "
+            f"{sorted(self.publish_classes) if self.publish_classes else []}"
         )
 
-        rospy.Subscriber(
-            source_topic,
-            CompressedImage,
-            self.callback,
-            queue_size=1,
-            buff_size=2**24,
-        )
-        rospy.loginfo(f"[yolo_detect_node] subscribe={source_topic} -> publish={output_topic}")
+        rospy.Subscriber(source_topic,
+                         CompressedImage,
+                         self.callback,
+                         queue_size=1,
+                         buff_size=2**24)
+        rospy.loginfo(f"[yolo_detect_node] Subscribed to {source_topic}")
+        rospy.loginfo(f"[yolo_detect_node] Publishing to {publish_topic}")
+
+    def _print_detection_status(self, status_lines):
+        if not status_lines:
+            return
+
+        if CLEAR_TERMINAL_ON_DETECTION and sys.stdout.isatty():
+            if self.previous_status_line_count > 0:
+                sys.stdout.write(f"\033[{self.previous_status_line_count}F")
+                sys.stdout.write("\033[J")
+
+            for line in status_lines:
+                sys.stdout.write(f"{line}\n")
+            sys.stdout.flush()
+            self.previous_status_line_count = len(status_lines)
+            return
+
+        for line in status_lines:
+            print(line)
 
     def callback(self, msg: CompressedImage):
         frame = cv2.imdecode(np.frombuffer(msg.data, np.uint8), cv2.IMREAD_COLOR)
@@ -80,11 +104,19 @@ class YoloDetectNode:
         out.header = Header(stamp=msg.header.stamp, frame_id=frame_id)
 
         idx_counter = 0
-        for box in results.boxes:
+        total_boxes = len(results.boxes)
+        status_lines = []
+        if total_boxes == 0:
+            status_lines.append("[yolo_detect_node] NO DETECT")
+
+        for raw_idx, box in enumerate(results.boxes):
             cls_id = int(box.cls.cpu().item())
-            if self.publish_classes and cls_id not in self.publish_classes:
-                continue
+            conf = float(box.conf.cpu().item())
             x1, y1, x2, y2 = map(int, box.xyxy[0].cpu().tolist())
+            class_name = self.class_names.get(cls_id, f"unknown({cls_id})")
+
+            if cls_id not in self.publish_classes:
+                continue
 
             obj = Objects()
             obj.id = idx_counter
@@ -92,18 +124,20 @@ class YoloDetectNode:
             obj.x1, obj.y1, obj.x2, obj.y2 = x1, y1, x2, y2
             out.yolo_objects.append(obj)
             idx_counter += 1
+            status_lines.append(
+                f"[yolo_detect_node] DETECT class={class_name} conf={conf:.3f}"
+            )
 
-            if self.show_detection_image:
-                class_name = CLASS_NAMES.get(cls_id, f"unknown({cls_id})")
+            if SHOW_DETECTION_IMAGE:
                 cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                cv2.putText(
-                    frame, class_name, (x1, y1 - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2,
-                )
+                cv2.putText(frame, class_name, (x1, y1 - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+
+        self._print_detection_status(status_lines)
 
         self.pub.publish(out)
 
-        if self.show_detection_image:
+        if SHOW_DETECTION_IMAGE:
             cv2.imshow(self.win_name, frame)
             cv2.waitKey(1)
 
@@ -111,11 +145,10 @@ class YoloDetectNode:
         try:
             rospy.spin()
         except KeyboardInterrupt:
-            rospy.loginfo("[yolo_detect_node] shutting down")
+            rospy.loginfo("Shutting down YOLOv12 viewer.")
         finally:
-            if self.show_detection_image:
+            if SHOW_DETECTION_IMAGE:
                 cv2.destroyAllWindows()
-
 
 if __name__ == "__main__":
     node = YoloDetectNode()

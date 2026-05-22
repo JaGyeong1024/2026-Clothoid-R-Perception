@@ -1,0 +1,13 @@
+<launch>
+  <node pkg="yolov8" type="yolo_detect.py" name="yolo_detect_node" output="screen">
+    <!-- CompressedImage 토픽 -->
+    <param name="source" value="/camera/image_raw/compressed"/>
+    <!-- 모델 파일 경로 -->
+    <param name="yaml_cfg" value="$(find yolov8)/new_best0710.yaml"/>
+    <param name="pt_weights" value="$(find yolov8)/new_best0710.pt"/>
+    <!-- confidence threshold -->
+    <param name="confidence" value="0.4"/>
+    <param name="frame_id" value="camera_link"/>
+  </node>
+</launch>
+

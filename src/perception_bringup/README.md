@@ -8,16 +8,20 @@ Perception 스택의 통합 launch와 RViz 설정을 모은 메타 패키지.
 roslaunch perception_bringup perception.launch
 ```
 
-`LD_LIBRARY_PATH`는 yolov12.launch의 `<env>` 태그가 yolov12 노드 프로세스에만 set하므로 별도 export 불필요. 부모 셸/다른 노드 무영향.
-
-다음 4개 노드를 한꺼번에 띄움:
+이 launch는 다음 3개 노드만 띄움. YOLO 노드(yolov12, yolov8)는 환경 격리 문제로 통합에서 빼고 `rosrun`으로 별도 실행한다.
 
 | 노드 | 패키지 | env 처리 |
 |---|---|---|
-| `yolo_detect_node` | yolov12 | launch-prefix(`python_interp`)로 conda env python 강제 + `<env>` 태그로 LD_LIBRARY_PATH 노드 한정 set |
 | `livox_camera_fusion` | livox_camera_fusion | 시스템 (C++ 노드) |
 | `livox_euclidean_clustering` | livox_clustering | 격리 (launch-prefix로 `conda_env` 활성화) |
 | `velodyne_bev_detection` | velodyne_detection | 격리 (launch-prefix로 `conda_env` 활성화) |
+
+YOLO 노드는 별도 터미널에서:
+
+```bash
+rosrun yolov12 yolo_detect.py   # fusion이 구독하는 카메라 YOLO
+rosrun yolov8  yolo_detect.py   # velodyne_detection이 쓰는 YOLO
+```
 
 ## Launch arguments
 
@@ -25,8 +29,6 @@ roslaunch perception_bringup perception.launch
 |---|---|---|
 | `conda_base` | `$(env HOME)/anaconda3` | conda 설치 경로 (livox_clustering / velodyne_detection 용) |
 | `conda_env` | `clothoid` | livox_clustering, velodyne_detection 용 env |
-| `python_interp` | `/home/cnu/anaconda3/envs/yolo/bin/python` | yolov12 노드의 인터프리터(launch-prefix로 강제). catkin wrapper의 시스템 python shebang을 우회 |
-| `conda_env_lib` | `/home/cnu/anaconda3/envs/yolo/lib` | yolov12 노드 LD_LIBRARY_PATH에 prepend되는 lib 경로 |
 | `camera_yolo_topic` | `/perception/camera/yolo` | 카메라 YOLO 출력 + fusion 입력 |
 | `livox_centroid_topic` | `/perception/livox/centroids` | Livox clustering 외부 출력 |
 | `fusion_centroid_topic` | `/perception/fusion/centroids` | Livox-camera fusion 외부 출력 |
