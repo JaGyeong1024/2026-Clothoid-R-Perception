@@ -110,21 +110,25 @@ ROS dependency install:
 rosdep install --from-paths src --ignore-src -r -y
 ```
 
-Conda environment:
+System python3 perception deps (livox_clustering, velodyne_detection 노드용):
 
 ```bash
-source $HOME/anaconda3/etc/profile.d/conda.sh
-conda env create -f environment.yml
-conda activate clothoid
+sudo python3 -m pip install --no-cache-dir \
+  --extra-index-url https://download.pytorch.org/whl/cu121 \
+  'typing-extensions==4.13.2' 'numpy>=1.24,<1.25' 'pillow>=10.0,<11.0' \
+  'scikit-learn>=1.3,<1.4' \
+  torch==2.4.1+cu121 torchvision==0.19.1+cu121 \
+  ultralytics==8.4.51 ultralytics-thop==2.0.19 opencv-python==4.13.0.92 \
+  filterpy==1.4.5 lap==0.5.12
 ```
+
+(Dockerfile은 위 핀과 동일 — 컨테이너 기반으로 돌리면 이 단계 불필요)
 
 YOLO env (담당자 셋업 기준 — 타겟 PC `cnu`):
 
 `yolov12` 노드는 shebang(`#!/home/cnu/anaconda3/envs/yolo/bin/python`)으로 conda env를 직접 호출합니다. 이 env에 다음이 깔려 있어야 함:
 - yolov12 지원 ultralytics fork (담당자 PC `/home/cnu/clothoid-r/perception_ws/yolov12`)
 - `torch`, `numpy`, `opencv-python`, `rospkg`, `thop` — `yolo-requirements.txt` 참조
-
-`velodyne_detection`은 자체적으로 `ultralytics`(clothoid env에 포함)로 YOLO 추론하므로 별도 노드 불필요.
 
 OC-SORT:
 
@@ -136,32 +140,18 @@ Workspace build:
 
 ```bash
 source /opt/ros/noetic/setup.bash
-source $HOME/anaconda3/etc/profile.d/conda.sh
-conda activate clothoid
 catkin_make
 source devel/setup.bash
 ```
 
 ## Run
 
-Bringup (fusion + livox_clustering + velodyne_detection):
+세 명령어를 따로 띄움 (각각 터미널 분리):
 
 ```bash
-roslaunch perception_bringup perception.launch
-```
-
-카메라 YOLO 노드는 환경 격리 문제로 분리, 별도 터미널에서:
-
-```bash
-rosrun yolov12 yolo_detect.py   # fusion 입력 (yolo conda env, shebang으로 진입)
-```
-
-Custom conda path:
-
-```bash
-roslaunch perception_bringup perception.launch \
-  conda_base:=/opt/miniconda3 \
-  conda_env:=clothoid
+roslaunch perception_bringup perception.launch         # fusion + livox_clustering
+rosrun velodyne_detection velodyne_bev_detection.py    # 시스템 python3
+rosrun yolov12 yolo_detect.py                          # conda yolo env via shebang
 ```
 
 Sensor topic override:
@@ -169,32 +159,18 @@ Sensor topic override:
 ```bash
 roslaunch perception_bringup perception.launch \
   livox_lidar_topic:=/livox/lidar \
-  velodyne_points_topic:=/velodyne_points \
   camera_image_topic:=/camera/image_raw/compressed
-```
-
-Velodyne BEV CPU mode:
-
-```bash
-roslaunch perception_bringup perception.launch \
-  velodyne_device:=cpu
 ```
 
 ## Launch Arguments
 
 | Argument | Default |
 |---|---|
-| `conda_base` | `$(env HOME)/anaconda3` |
-| `conda_env` | `clothoid` |
 | `livox_lidar_topic` | `/livox/lidar` |
-| `velodyne_points_topic` | `/velodyne_points` |
 | `camera_image_topic` | `/camera/image_raw/compressed` |
 | `camera_yolo_topic` | `/perception/camera/yolo` |
 | `livox_centroid_topic` | `/perception/livox/centroids` |
 | `fusion_centroid_topic` | `/perception/fusion/centroids` |
-| `velodyne_centroid_topic` | `/perception/velodyne/centroids` |
-| `velodyne_device` | `cuda` |
-| `ocsort_path` | `/opt/OC_SORT` |
 
 ## Verification
 

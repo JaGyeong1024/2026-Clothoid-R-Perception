@@ -1,7 +1,8 @@
 <launch>
-  <!-- Conda env (velodyne_bev_detection도 ultralytics 의존이라 격리) -->
-  <arg name="conda_base"     default="$(env HOME)/anaconda3"/>
-  <arg name="conda_env"      default="clothoid"/>
+  <!--
+    시스템 python3로 실행. ultralytics/torch/opencv는 시스템에 깔려있어야 함.
+    참고: 차량 운영은 이 launch 안 쓰고 `rosrun velodyne_detection velodyne_bev_detection.py`로 띄움.
+  -->
 
   <!-- I/O -->
   <arg name="input_topic"    default="/velodyne_points"/>
@@ -16,17 +17,10 @@
   <arg name="detect_conf"    default="0.4"/>
   <arg name="frame_id"       default="velodyne"/>
 
-  <!--
-    launch-prefix is the conda env's python interpreter path. We invoke the
-    catkin-generated wrapper script as an argument to that interpreter, which
-    bypasses the wrapper's `#!/usr/bin/python3` shebang. (`conda activate`
-    alone does not — Linux honors the shebang on exec regardless of PATH.)
-  -->
   <node pkg="velodyne_detection"
         type="velodyne_bev_detection.py"
         name="velodyne_bev_detection"
-        output="screen"
-        launch-prefix="$(arg conda_base)/envs/$(arg conda_env)/bin/python">
+        output="screen">
     <param name="input_topic"          value="$(arg input_topic)"/>
     <param name="centroid_topic"       value="$(arg centroid_topic)"/>
     <param name="marker_topic"         value="$(arg marker_topic)"/>

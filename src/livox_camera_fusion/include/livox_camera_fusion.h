@@ -30,25 +30,39 @@
 #include <map>
 
 /* ===== Parameters ===== */
-static constexpr double BBOX_SCALE_RATIO = 0.8;
+static constexpr double BBOX_SCALE_RATIO = 1.0;
 static constexpr double GROUND_THRESH = 0.0;
 static constexpr double CLUSTER_TOLERANCE = 0.4;
-static constexpr int CLUSTER_MIN_SIZE = 3;
+static constexpr int CLUSTER_MIN_SIZE = 2;
 static constexpr int CLUSTER_MAX_SIZE = 100;
 static constexpr double ROI_RADIUS_PX = 10.0;
-static constexpr double MATCH_DIST = 7.0;
-static constexpr int TRACKER_MAX_MISS = 15;
+static constexpr double MATCH_DIST = 0.7;  // 20km/h @ 10Hz → frame당 ego 이동 ~0.56m + jitter 여유
+static constexpr int TRACKER_MAX_MISS = 10;
 static constexpr int MIN_BBOX_EDGE_PX = 0;
 
-/* 3D ROI (livox_frame, m).
-   bbox 안에 투영된 점 중 이 박스 밖에 있는 것은 버림.
-   먼 거리 배경이 bbox로 끌려와 fake centroid 만드는 문제 방지용. */
-static constexpr double FUSION_ROI_X_MIN = 0.0;
-static constexpr double FUSION_ROI_X_MAX = 12.0;
-static constexpr double FUSION_ROI_Y_MIN = -4.0;
-static constexpr double FUSION_ROI_Y_MAX = 4.0;
-static constexpr double FUSION_ROI_Z_MIN = -2.0;
-static constexpr double FUSION_ROI_Z_MAX = 2.0;
+/* ===== Livox 마운트 pitch 보정 (bag /livox/lidar RANSAC 측정) ===== */
+/* livox가 앞쪽 아래로 +0.73° 기울어져 있음. projection 후 lidar_points를 leveled frame으로 */
+/* 회전 → 이후 ROI / cluster bbox는 모두 leveled (=물리적) 좌표 기준. projection 자체는    */
+/* extrinsic_matrix가 기울임을 흡수하므로 보정 불필요.                                       */
+static constexpr double LIDAR_PITCH_DEG = 0.73;
+
+/* ===== LiDAR 3D ROI (leveled livox_frame 기준, projection 후 적용) ===== */
+static constexpr double LIDAR_ROI_X_MIN =  0.0;
+static constexpr double LIDAR_ROI_X_MAX = 15.0;
+static constexpr double LIDAR_ROI_Y_MIN = -7.0;
+static constexpr double LIDAR_ROI_Y_MAX =  7.0;
+static constexpr double LIDAR_ROI_Z_MIN = -2.0;
+static constexpr double LIDAR_ROI_Z_MAX =  2.0;
+
+/* ===== 3D BBOX gate (cluster AABB, livox_frame: x=length, y=width, z=height) ===== */
+/* livox_clustering yaml schema와 동일 구조 — 추후 클래스별 분리할 때 확장 용이.        */
+/* 현재는 MIN만 0.05로 노이즈 컷, MAX는 사실상 disabled(10m).                          */
+static constexpr double CLUSTER_MIN_LENGTH = 0.01;
+static constexpr double CLUSTER_MAX_LENGTH = 10.0;
+static constexpr double CLUSTER_MIN_WIDTH  = 0.01;
+static constexpr double CLUSTER_MAX_WIDTH  = 10.0;
+static constexpr double CLUSTER_MIN_HEIGHT = 0.01;
+static constexpr double CLUSTER_MAX_HEIGHT = 10.0;
 
 /* ===== Kalman Tracker ===== */
 struct KalmanTracker
@@ -118,7 +132,8 @@ private:
     pcl::PointCloud<pcl::PointXYZ>::Ptr remove_ground_from_cloud(
         const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud);
     bool largest_cluster_centroid(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud,
-                                  cv::Point2d &centroid) const;
+                                  cv::Point2d &centroid,
+                                  cv::Vec3d &extent) const;
     void draw_bbox_debug(const ImageBox &box);
     void publish_2D_pointcloud(const std::vector<cv::Point2d> &pts,
                                const std_msgs::Header &header);

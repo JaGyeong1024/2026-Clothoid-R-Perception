@@ -8,49 +8,31 @@ Perception 스택의 통합 launch와 RViz 설정을 모은 메타 패키지.
 roslaunch perception_bringup perception.launch
 ```
 
-이 launch는 다음 3개 노드만 띄움. 카메라 YOLO(yolov12)는 conda env 격리 때문에 통합에서 빼고 `rosrun`으로 별도 실행한다.
+다음 2개 노드를 띄움:
 
-| 노드 | 패키지 | env 처리 |
+| 노드 | 패키지 | 인터프리터 |
 |---|---|---|
 | `livox_camera_fusion` | livox_camera_fusion | 시스템 (C++ 노드) |
-| `livox_euclidean_clustering` | livox_clustering | 격리 (launch-prefix로 `conda_env` 활성화) |
-| `velodyne_bev_detection` | velodyne_detection | 격리 (launch-prefix로 `conda_env` 활성화) |
+| `livox_euclidean_clustering` | livox_clustering | 시스템 python3 |
 
-카메라 YOLO 노드는 별도 터미널에서:
+`velodyne_detection`, `yolov12`는 환경 격리 / 차량 운영 방식에 맞춰 이 launch에서 분리되어 있음. 별도 터미널에서:
 
 ```bash
-rosrun yolov12 yolo_detect.py   # fusion 입력 (yolo conda env, shebang으로 진입)
+rosrun velodyne_detection velodyne_bev_detection.py   # 시스템 python3
+rosrun yolov12 yolo_detect.py                         # conda yolo env (shebang)
 ```
 
 ## Launch arguments
 
 | 이름 | 기본값 | 설명 |
 |---|---|---|
-| `conda_base` | `$(env HOME)/anaconda3` | conda 설치 경로 (livox_clustering / velodyne_detection 용) |
-| `conda_env` | `clothoid` | livox_clustering, velodyne_detection 용 env |
-| `camera_yolo_topic` | `/perception/camera/yolo` | 카메라 YOLO 출력 + fusion 입력 |
-| `livox_centroid_topic` | `/perception/livox/centroids` | Livox clustering 외부 출력 |
-| `fusion_centroid_topic` | `/perception/fusion/centroids` | Livox-camera fusion 외부 출력 |
-| `velodyne_centroid_topic` | `/perception/velodyne/centroids` | Velodyne BEV 외부 출력 |
+| `livox_lidar_topic` | `/livox/lidar` | Livox 입력 토픽 |
+| `camera_image_topic` | `/camera/image_raw/compressed` | 카메라 입력 토픽 |
+| `camera_yolo_topic` | `/perception/camera/yolo` | YOLO 결과 (fusion 입력) |
+| `livox_centroid_topic` | `/perception/livox/centroids` | Livox clustering 출력 |
+| `fusion_centroid_topic` | `/perception/fusion/centroids` | Livox-camera fusion 출력 |
 | `fusion_projection_config` | `$(find livox_camera_fusion)/config/projection.yaml` | fusion projection 파라미터 |
 | `livox_clustering_config` | `$(find livox_clustering)/config/livox_clustering.yaml` | Livox clustering 알고리즘 파라미터 |
-
-머신마다 다르면 override:
-
-```bash
-roslaunch perception_bringup perception.launch \
-  conda_base:=/opt/miniconda3 conda_env:=my_env
-```
-
-## 로컬 RViz용 정적 TF (placeholder)
-
-`livox_frame`과 `velodyne` 두 프레임만으로는 RViz가 둘을 한 화면에 정합 못 함. 임시로 정적 TF 발행하는 launch:
-
-```bash
-roslaunch perception_bringup tf_static.launch
-```
-
-Fixed Frame은 `ego_vehicle`로 설정. 값은 Clothoid-R URDF에서 가져온 placeholder — 정식 calibration 후 robot_state_publisher + URDF로 교체 권장. bringup launch에는 의도적으로 포함하지 않았음.
 
 ## RViz 설정
 
@@ -59,5 +41,3 @@ Fixed Frame은 `ego_vehicle`로 설정. 값은 Clothoid-R URDF에서 가져온 p
 ```bash
 rviz -d $(rospack find perception_bringup)/rviz/perception.rviz
 ```
-
-> 현재 RViz config는 옛 토픽명(`/jagyeong`, `/minjae` 등) 기반일 수 있습니다. 새 토픽명에 맞게 업데이트 필요.

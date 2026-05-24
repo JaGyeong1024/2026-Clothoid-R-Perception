@@ -1,25 +1,19 @@
 <launch>
-  <!-- Conda env (scipy, sklearn 의존이라 격리) -->
-  <arg name="conda_base"         default="$(env HOME)/anaconda3"/>
-  <arg name="conda_env"          default="clothoid"/>
-
+  <!--
+    velodyne_detection과 마찬가지로 시스템 python3로 실행한다.
+    필요 deps(numpy, scipy, scikit-learn)는 시스템 python3에 설치돼 있어야 함.
+    차량 PC도 동일 방식으로 동작 중.
+  -->
   <arg name="input_topic"        default="/livox/lidar"/>
   <arg name="centroid_topic"     default="/perception/livox/centroids"/>
   <arg name="preprocessed_topic" default="/perception/livox/preprocessed"/>
   <arg name="frame_id"           default="livox_frame"/>
   <arg name="config"             default="$(find livox_clustering)/config/livox_clustering.yaml"/>
 
-  <!--
-    launch-prefix is the conda env's python interpreter path. We invoke the
-    catkin-generated wrapper script as an argument to that interpreter, which
-    bypasses the wrapper's `#!/usr/bin/python3` shebang. (`conda activate`
-    alone does not — Linux honors the shebang on exec regardless of PATH.)
-  -->
   <node pkg="livox_clustering"
         type="livox_euclidean_clustering.py"
         name="livox_euclidean_clustering"
-        output="screen"
-        launch-prefix="$(arg conda_base)/envs/$(arg conda_env)/bin/python">
+        output="screen">
     <rosparam command="load" file="$(arg config)"/>
     <param name="input_topic"        value="$(arg input_topic)"/>
     <param name="centroid_topic"     value="$(arg centroid_topic)"/>

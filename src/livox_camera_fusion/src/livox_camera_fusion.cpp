@@ -9,6 +9,7 @@
 #include <pcl/search/kdtree.h>
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <numeric>
 #include <random>
 #include <set>
@@ -102,14 +103,40 @@ void LivoxCameraFusion::detectionCallback(
     pcl::fromROSMsg(*lidar_msg, *pc);
 
     lidar_points.clear();
+    lidar_points.reserve(pc->points.size());
     for (const auto &p : pc->points)
     {
-        lidar_points.emplace_back(p.x, p.y, p.z);
+        lidar_points.emplace_back(p.x, p.y, p.z);  // raw, projection 용
     }
     if (lidar_points.empty())
         return;
 
+    // raw frame 그대로 image 투영 (extrinsic이 기울임 흡수)
     cv::perspectiveTransform(lidar_points, projected_list, projection_matrix);
+
+    // leveled frame으로 회전 + ROI (raw->leveled, projected_list 와 인덱스 동기 유지)
+    const double th = LIDAR_PITCH_DEG * M_PI / 180.0;
+    const double c = std::cos(th), s = std::sin(th);
+    std::vector<cv::Point3d> kept_points;
+    std::vector<cv::Point2d> kept_proj;
+    kept_points.reserve(lidar_points.size());
+    kept_proj.reserve(projected_list.size());
+    for (size_t i = 0; i < lidar_points.size(); ++i)
+    {
+        const auto &q = lidar_points[i];
+        const double x_lvl =  c * q.x + s * q.z;
+        const double z_lvl = -s * q.x + c * q.z;
+        if (x_lvl < LIDAR_ROI_X_MIN || x_lvl > LIDAR_ROI_X_MAX) continue;
+        if (q.y   < LIDAR_ROI_Y_MIN || q.y   > LIDAR_ROI_Y_MAX) continue;
+        if (z_lvl < LIDAR_ROI_Z_MIN || z_lvl > LIDAR_ROI_Z_MAX) continue;
+        kept_points.emplace_back(x_lvl, q.y, z_lvl);
+        kept_proj.push_back(projected_list[i]);
+    }
+    lidar_points  = std::move(kept_points);
+    projected_list = std::move(kept_proj);
+    if (lidar_points.empty())
+        return;
+
     convert_msg(yolo_msg, lidar_msg->header);
 }
 
@@ -143,8 +170,14 @@ void LivoxCameraFusion::convert_msg(
             continue;
 
         cv::Point2d centroid;
-        if (!largest_cluster_centroid(roi_ng, centroid))
+        cv::Vec3d ext;
+        if (!largest_cluster_centroid(roi_ng, centroid, ext))
             continue;
+        // 3D AABB gate (length=x, width=y, height=z)
+        const double length = ext[0], width = ext[1], height = ext[2];
+        if (length < CLUSTER_MIN_LENGTH || length > CLUSTER_MAX_LENGTH) continue;
+        if (width  < CLUSTER_MIN_WIDTH  || width  > CLUSTER_MAX_WIDTH)  continue;
+        if (height < CLUSTER_MIN_HEIGHT || height > CLUSTER_MAX_HEIGHT) continue;
         cur_centroids.push_back(centroid);
 
         draw_bbox_debug(box);
@@ -189,19 +222,15 @@ void LivoxCameraFusion::collect_points_in_bbox(
 {
     for (size_t i = 0; i < projected_list.size(); ++i)
     {
-        const auto &lp = lidar_points[i];
-        // 3D ROI: bbox에 같이 끌려온 먼 거리 배경 포인트 컷
-        if (lp.x < FUSION_ROI_X_MIN || lp.x > FUSION_ROI_X_MAX ||
-            lp.y < FUSION_ROI_Y_MIN || lp.y > FUSION_ROI_Y_MAX ||
-            lp.z < FUSION_ROI_Z_MIN || lp.z > FUSION_ROI_Z_MAX)
-            continue;
         double u = projected_list[i].x, v = projected_list[i].y;
         if (std::isnan(u) || std::isnan(v))
             continue;
         if (u >= box.x1 && u <= box.x2 && v >= box.y1 && v <= box.y2)
         {
             matched_px.emplace_back(u, v);
-            local->points.emplace_back(lp.x, lp.y, lp.z);
+            local->points.emplace_back(lidar_points[i].x,
+                                       lidar_points[i].y,
+                                       lidar_points[i].z);
         }
     }
 }
@@ -239,7 +268,8 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr LivoxCameraFusion::remove_ground_from_cloud(
 
 bool LivoxCameraFusion::largest_cluster_centroid(
     const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud,
-    cv::Point2d &centroid) const
+    cv::Point2d &centroid,
+    cv::Vec3d &extent) const
 {
     pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>);
     std::vector<pcl::PointIndices> clusters;
@@ -260,13 +290,23 @@ bool LivoxCameraFusion::largest_cluster_centroid(
             return a.indices.size() < b.indices.size();
         });
     double sx = 0, sy = 0;
+    double xmin =  std::numeric_limits<double>::infinity();
+    double ymin =  std::numeric_limits<double>::infinity();
+    double zmin =  std::numeric_limits<double>::infinity();
+    double xmax = -std::numeric_limits<double>::infinity();
+    double ymax = -std::numeric_limits<double>::infinity();
+    double zmax = -std::numeric_limits<double>::infinity();
     for (int idx : largest.indices)
     {
-        sx += cloud->points[idx].x;
-        sy += cloud->points[idx].y;
+        const auto &p = cloud->points[idx];
+        sx += p.x; sy += p.y;
+        xmin = std::min(xmin, (double)p.x); xmax = std::max(xmax, (double)p.x);
+        ymin = std::min(ymin, (double)p.y); ymax = std::max(ymax, (double)p.y);
+        zmin = std::min(zmin, (double)p.z); zmax = std::max(zmax, (double)p.z);
     }
     centroid = cv::Point2d(sx / largest.indices.size(),
                            sy / largest.indices.size());
+    extent = cv::Vec3d(xmax - xmin, ymax - ymin, zmax - zmin);
     return true;
 }
 
