@@ -21,6 +21,17 @@ Clothoid-R 자율주행 시스템의 Perception ROS workspace.
   <a href="https://github.com/ysjee0229"><img src="https://avatars.githubusercontent.com/u/187412639?v=4" width="100px;" alt=""/><br /><sub><b>지연수</b></sub></a><br />Computer Vision, <br />Edge Deployment
 </td>
 </tr>
+<tr>
+<td align="center" width="180">
+  <a href="https://github.com/heojy"><img src="https://github.com/heojy.png?size=200" width="100px;" alt=""/><br /><sub><b>허주영</b></sub></a><br />Camera-LiDAR<br />Sensor Fusion
+</td>
+<td align="center" width="180">
+  <img src="https://github.com/ghost.png?size=200" width="100px;" alt=""/><br /><sub><b>김제은</b></sub><br />
+</td>
+<td align="center" width="180">
+  <img src="https://github.com/ghost.png?size=200" width="100px;" alt=""/><br /><sub><b>진채민</b></sub><br />
+</td>
+</tr>
 </table>
 </div>
 
