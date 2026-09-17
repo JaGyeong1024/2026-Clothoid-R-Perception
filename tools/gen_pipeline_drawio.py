@@ -14,8 +14,8 @@ def cell(value, style, x, y, w, h, parent="1", cid=None):
     return cid
 
 def tlabel(text, cx, cy, w=130, h=24):
-    """절대좌표 라벨 (중심 cx, cy). 흰 배경으로 선 위에 올려도 읽힘"""
-    return cell(text, "text;html=1;align=center;verticalAlign=middle;fontSize=9;fontStyle=1;strokeColor=none;fillColor=#ffffff;spacing=0;", cx - w // 2, cy - h // 2, w, h)
+    """절대좌표 라벨 (중심 cx, cy), 배경 투명"""
+    return cell(text, "text;html=1;align=center;verticalAlign=middle;fontSize=9;fontStyle=1;strokeColor=none;fillColor=none;spacing=0;", cx - w // 2, cy - h // 2, w, h)
 
 def edge(src, tgt, exit_, entry, points=(), label="", color="#000000", dashed=False, label_pos=(0, 0), cid=None):
     cid = cid or f"e{next(_id)}"
