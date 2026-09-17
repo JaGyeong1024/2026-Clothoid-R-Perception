@@ -11,7 +11,7 @@
   <arg name="image_topic"    default="/perception/velodyne/bev_image"/>
 
   <!-- Model / Tracking -->
-  <arg name="model_version"  default="velodyne_v4"/>
+  <arg name="model_version"  default="velodyne_v6"/>
   <arg name="ocsort_path"    default="/opt/OC_SORT"/>
   <arg name="device"         default="cuda"/>
   <arg name="detect_conf"    default="0.4"/>
