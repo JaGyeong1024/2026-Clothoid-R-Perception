@@ -1,9 +1,8 @@
-# yolov12 fork runtime deps for the `yolo` conda env.
-# Mirrors /home/cnu/clothoid-r/perception_ws/yolov12/requirements.txt but pins
-# torch/torchvision to the CUDA 12.1 wheels that match the cnu PC driver.
-# The fork itself is bind-mounted from the host and imported via
-# `sys.path.insert(0, "/home/cnu/clothoid-r/perception_ws/yolov12")` —
-# no editable install needed, only the deps below.
+# `yolo` conda env runtime deps for the yolo26 node (perception_ws/src/yolo26).
+# Mirrors perception_ws/yolo26/requirements.txt but pins torch/torchvision to the
+# CUDA 12.1 wheels that match the cnu PC driver.
+# The custom ultralytics lives in-repo at perception_ws/yolo26 and is imported by
+# yolo_detect.py via a path relative to the script — no editable install needed.
 
 --extra-index-url https://download.pytorch.org/whl/cu121
 
@@ -27,7 +26,7 @@ safetensors==0.4.3
 numpy==1.26.4
 supervision==0.22.0
 
-# Hard import inside yolov12 fork's ultralytics/utils/torch_utils.py.
+# Hard import inside the custom ultralytics' utils/torch_utils.py.
 thop==0.1.1.post2209072238
 
 # ROS rospy import in yolo_detect.py.

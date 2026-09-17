@@ -41,6 +41,8 @@ Clothoid-R 자율주행 시스템의 Perception ROS workspace.
 
 | Pipeline | Input | Output | Package |
 |---|---|---|---|
+| Camera publish | 웹캠 (V4L2/GStreamer) | `/camera/image_raw`, `/camera/image_raw/compressed` | `camera_start` (system_ws) |
+| Camera YOLO | `/camera/image_raw/compressed` | `/perception/camera/yolo` | `yolo26` |
 | Livox clustering | `/livox/lidar` | `/perception/livox/centroids` | `livox_clustering` |
 | Livox-camera fusion | `/livox/lidar`, `/camera/image_raw/compressed`, `/perception/camera/yolo` | `/perception/fusion/centroids` | `livox_camera_fusion` |
 | Velodyne BEV detection | `/velodyne_points` | `/perception/velodyne/centroids` | `velodyne_detection` |
@@ -56,10 +58,19 @@ Clothoid-R 자율주행 시스템의 Perception ROS workspace.
 | `livox_camera_fusion` | Livox-camera YOLO fusion |
 | `velodyne_detection` | Velodyne BEV YOLO detection and OC-SORT tracking |
 
+`system_ws/src`:
+
+| Package | Role |
+|---|---|
+| `camera_start` | 웹캠 캡처 + undistort 퍼블리시 (빈 프레임 연속 시 자동 재오픈) |
+| `livox_ros_driver` | Livox LiDAR 드라이버 |
+| `velodyne` | Velodyne VLP-16 드라이버 (`velodyne_pointcloud`) |
+
 ## Output Topics
 
 | Topic | Type |
 |---|---|
+| `/perception/camera/yolo` | `detect_msgs/Yolo_Objects` |
 | `/perception/livox/centroids` | `sensor_msgs/PointCloud` |
 | `/perception/fusion/centroids` | `sensor_msgs/PointCloud` |
 | `/perception/velodyne/centroids` | `sensor_msgs/PointCloud` |
@@ -139,7 +150,7 @@ sudo python3 -m pip install --no-cache-dir \
   filterpy==1.4.5 lap==0.5.12
 ```
 
-(Dockerfile은 위 핀과 동일 — 컨테이너 기반으로 돌리면 이 단계 불필요)
+(로컬 개발용 Dockerfile은 레포에 포함하지 않음 — `.gitignore` 참조)
 
 YOLO env (담당자 셋업 기준 — 타겟 PC `cnu`):
 
@@ -174,6 +185,19 @@ rosrun velodyne_detection velodyne_bev_detection.py    # 시스템 python3
 rosrun yolo26 yolo_detect.py                           # conda yolo env via shebang
 ```
 
+자주 쓰는 노드 파라미터 (rosrun은 `_이름:=값`, launch는 arg):
+
+```bash
+rosrun yolo26 yolo_detect.py _show_image:=true          # 검출 영상 창 표시 (기본 False, headless)
+rosrun yolo26 yolo_detect.py _imgsz:=960                # 추론 해상도 (기본 0 = 원본 해상도)
+rosrun velodyne_detection velodyne_bev_detection.py _stale_timeout:=0.5   # 입력 두절 시 빈 발행까지 초
+roslaunch velodyne_detection velodyne_detection.launch model_version:=velodyne_v6
+```
+
+주의: `velodyne_detection.launch`의 `model_version` 기본값은 `velodyne_v4`, `rosrun` 직접 실행 시 스크립트 기본값은 `velodyne_v6`입니다.
+`livox_clustering`의 트랙 확정 프레임 수(`tracker_min_hits`, 기본 3)와 크기 게이트는 `config/livox_clustering.yaml`에서 조정합니다.
+launch로 띄운 인지 노드(`camera_start`, fusion, clustering, velodyne)는 `respawn="true"`라 죽으면 2초 후 자동 재시작됩니다.
+
 Sensor topic override:
 
 ```bash
@@ -191,6 +215,10 @@ roslaunch perception_bringup perception.launch \
 | `camera_yolo_topic` | `/perception/camera/yolo` |
 | `livox_centroid_topic` | `/perception/livox/centroids` |
 | `fusion_centroid_topic` | `/perception/fusion/centroids` |
+| `fusion_projection_config` | `$(find livox_camera_fusion)/config/projection.yaml` |
+| `livox_clustering_config` | `$(find livox_clustering)/config/livox_clustering.yaml` |
+
+개별 launch (`livox_camera_fusion.launch`, `livox_clustering.launch`, `velodyne_detection.launch`)의 인자는 각 파일 상단 `<arg>` 참조.
 
 ## Verification
 
@@ -203,10 +231,11 @@ rosnode list
 Expected nodes:
 
 ```text
+/camera_start_node
 /yolo_detect_node
 /livox_camera_fusion
 /livox_euclidean_clustering
-/velodyne_bev_detection
+/velodyne_bev_detection_<id>     # anonymous=True 라 접미사가 붙음
 ```
 
 Topic check:
@@ -218,6 +247,8 @@ rostopic list | grep perception
 Output publisher check:
 
 ```bash
+rostopic hz /camera/image_raw/compressed
+rostopic info /perception/camera/yolo
 rostopic info /perception/livox/centroids
 rostopic info /perception/fusion/centroids
 rostopic info /perception/velodyne/centroids
