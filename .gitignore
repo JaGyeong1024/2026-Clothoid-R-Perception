@@ -2,7 +2,6 @@
 /*
 !/.gitignore
 !/README.md
-!/docs/
 !/tools/
 /tools/*
 !/tools/gen_pipeline_drawio.py
@@ -10,9 +9,7 @@
 !/system_ws/
 !/2026_pipeline.drawio
 !/2026_pipeline.png
-!/yolo-requirements.txt
-!/snapshot_host_rootfs.sh
-!/ver1.zip
+!/docker/
 
 # ===== catkin / ROS build artifacts =====
 build/
