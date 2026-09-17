@@ -1,4 +1,4 @@
-pitch_deg: 0.73   # bag /livox/lidar RANSAC 측정 (median, 60 frames, std 0.01°)
+pitch_deg: 0.73   # 마운트 pitch (bag RANSAC 측정)
 
 roi_x_min: 0.0
 roi_x_max: 8.0
@@ -22,13 +22,13 @@ euclidean_min_cluster_size: 5
 cluster_merge_gap: 0.5
 max_length: 2.5
 max_width: 2.5
-max_height: 1.8   # 1.0→1.8: ERP·사람 수용 (bag 실측: 사람 H 1.0~1.32 탈락 확인)
-min_length: 0.3   # 0.5→0.3: 라바콘(0.37m) 수용
-min_width: 0.3    # 0.5→0.3: 라바콘 수용
+max_height: 1.8   # ERP·사람 수용
+min_length: 0.3   # 라바콘(0.37m) 수용
+min_width: 0.3
 min_height: 0.3
 euclidean_base_dist: 0.1
 euclidean_dist_scale: 0.05
 
 tracker_max_miss: 5
-tracker_min_hits: 3   # 3프레임 연속 관측된 트랙만 발행 (노이즈 억제)
+tracker_min_hits: 3   # 이 프레임 수 이상 연속 관측된 트랙만 발행
 match_dist: 1.5

@@ -14,7 +14,7 @@ from scipy.spatial import cKDTree
 from sklearn.linear_model import RANSACRegressor
 import std_msgs.msg
 
-# -------------------- 하드코딩 파라미터 --------------------
+# ---- 기본 파라미터 (yaml / rosparam 으로 덮어씀) ----
 PITCH_DEG        = 0.1
 ROI_X_MIN, ROI_X_MAX = 0, 12
 ROI_Y_MIN, ROI_Y_MAX = -4, 4
@@ -34,14 +34,13 @@ GROUND_THRESH = 0.3
 
 EUCLIDEAN_MIN_CLUSTER_SIZE = 5
 CLUSTER_MERGE_GAP          = 0.5
-MAX_LENGTH, MAX_WIDTH, MAX_HEIGHT = 2.5, 2.5, 1.8   # H 1.0→1.8: ERP·사람 수용 (기둥은 MIN_WIDTH가 방어)
-MIN_LENGTH, MIN_WIDTH, MIN_HEIGHT = 0.3, 0.3, 0.3   # L·W 0.5→0.3: 라바콘(0.37m) 수용
+MAX_LENGTH, MAX_WIDTH, MAX_HEIGHT = 2.5, 2.5, 1.8   # 높이 1.8: ERP·사람 수용
+MIN_LENGTH, MIN_WIDTH, MIN_HEIGHT = 0.3, 0.3, 0.3   # 0.3: 라바콘(0.37m) 수용
 EUCLIDEAN_BASE_DIST, EUCLIDEAN_DIST_SCALE = 0.05, 0.05
 
 TRACKER_MAX_MISS = 5
 MATCH_DIST       = 1.5
-TRACKER_MIN_HITS = 3   # 이 프레임 수 이상 연속 관측된 트랙만 발행 (노이즈 억제)
-# ---------------------------------------------------------
+TRACKER_MIN_HITS = 3   # 이 프레임 수 이상 연속 관측된 트랙만 발행
 
 def load_algorithm_params():
     global PITCH_DEG, ROI_X_MIN, ROI_X_MAX, ROI_Y_MIN, ROI_Y_MAX, ROI_Z_MIN, ROI_Z_MAX

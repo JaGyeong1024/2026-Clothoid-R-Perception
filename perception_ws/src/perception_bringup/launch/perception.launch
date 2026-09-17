@@ -1,9 +1,6 @@
 <launch>
-  <!--
-    livox_camera_fusion(C++) + livox_euclidean_clustering(시스템 python3) 두 노드를 띄운다.
-    velodyne_detection / yolov12는 이 launch에 포함하지 않고 rosrun으로 별도 실행
-    (차량 운영 방식). yolov12만 shebang으로 conda yolo env 사용, 나머지 모두 시스템 환경.
-  -->
+  <!-- livox_camera_fusion(C++) + livox_euclidean_clustering(python3).
+       velodyne_detection, yolo26 은 rosrun 으로 별도 실행 -->
 
   <!-- Sensor input topics -->
   <arg name="livox_lidar_topic"      default="/livox/lidar"/>

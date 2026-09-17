@@ -35,17 +35,15 @@ static constexpr double CLUSTER_TOLERANCE = 0.4;
 static constexpr int CLUSTER_MIN_SIZE = 3;
 static constexpr int CLUSTER_MAX_SIZE = 100;
 static constexpr double ROI_RADIUS_PX = 10.0;
-static constexpr double MATCH_DIST = 0.7;  // 20km/h @ 10Hz → frame당 ego 이동 ~0.56m + jitter 여유
+static constexpr double MATCH_DIST = 0.7;  // 20km/h, 10Hz 기준 프레임당 ego 이동 ~0.56m + 여유
 static constexpr int TRACKER_MAX_MISS = 10;
 static constexpr int MIN_BBOX_EDGE_PX = 0;
 
-/* ===== Livox 마운트 pitch 보정 (bag /livox/lidar RANSAC 측정) ===== */
-/* livox가 앞쪽 아래로 +0.73° 기울어져 있음. projection 후 lidar_points를 leveled frame으로 */
-/* 회전 → 이후 ROI / cluster bbox는 모두 leveled (=물리적) 좌표 기준. projection 자체는    */
-/* extrinsic_matrix가 기울임을 흡수하므로 보정 불필요.                                       */
+/* ===== Livox 마운트 pitch (bag RANSAC 측정) ===== */
+/* projection 은 raw 좌표(extrinsic 이 기울임 흡수), ROI·cluster bbox 는 pitch 보정한 leveled 좌표 기준 */
 static constexpr double LIDAR_PITCH_DEG = 0.73;
 
-/* ===== LiDAR 3D ROI (leveled livox_frame 기준, projection 후 적용) ===== */
+/* ===== LiDAR 3D ROI (leveled 좌표) ===== */
 static constexpr double LIDAR_ROI_X_MIN =  0.0;
 static constexpr double LIDAR_ROI_X_MAX = 15.0;
 static constexpr double LIDAR_ROI_Y_MIN = -7.0;
@@ -53,20 +51,16 @@ static constexpr double LIDAR_ROI_Y_MAX =  7.0;
 static constexpr double LIDAR_ROI_Z_MIN = -2.0;
 static constexpr double LIDAR_ROI_Z_MAX =  2.0;
 
-/* ===== 전체 클라우드 지면 제거 (livox_clustering 방식 이식) ===== */
-/* 기존 per-bbox RANSAC은 bbox ROI의 포인트가 적어 지배 평면이 물체(콘·ERP 하부)를 물어    */
-/* GROUND_THRESH=0으로 꺼두었었음 → 폐기. 대신 bbox 매칭 전에 전체 클라우드(leveled)에      */
-/* grid(셀별 min-z) + RANSAC 평면 제거 적용: 지면 포인트는 충분해 진짜 지면이 잡히고,      */
-/* 물체는 하부 GRID_MAX_HEIGHT_DIFF 만큼만 잃음.                                            */
+/* ===== 지면 제거 (bbox 매칭 전 전체 클라우드에 grid + RANSAC) ===== */
+/* per-bbox RANSAC 은 점이 적어 물체 하부를 지면으로 오인하므로 전체 클라우드 방식 사용 */
 static constexpr bool   ENABLE_GROUND_REMOVAL = true;
 static constexpr double GRID_CELL_SIZE        = 0.2;
 static constexpr double GRID_MAX_HEIGHT_DIFF  = 0.2;
 static constexpr int    GRID_MIN_POINTS       = 10;
 static constexpr double GROUND_RANSAC_THRESH  = 0.2;  // livox_clustering(0.3)보다 보수적
 
-/* ===== 3D BBOX gate (cluster AABB, livox_frame: x=length, y=width, z=height) ===== */
-/* livox_clustering yaml schema와 동일 구조 — 추후 클래스별 분리할 때 확장 용이.        */
-/* 현재는 MIN만 0.05로 노이즈 컷, MAX는 사실상 disabled(10m).                          */
+/* ===== 3D bbox gate (cluster AABB: x=length, y=width, z=height) ===== */
+/* MIN 은 노이즈 컷, MAX 는 사실상 미사용 */
 static constexpr double CLUSTER_MIN_LENGTH = 0.1;
 static constexpr double CLUSTER_MAX_LENGTH = 10.0;
 static constexpr double CLUSTER_MIN_WIDTH  = 0.1;

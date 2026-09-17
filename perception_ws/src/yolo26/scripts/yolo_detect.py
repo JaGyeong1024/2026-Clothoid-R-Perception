@@ -11,18 +11,17 @@ from detect_msgs.msg import Objects, Yolo_Objects
 from sensor_msgs.msg import CompressedImage
 from std_msgs.msg import Header
 
-# 커스텀 ultralytics: <이 워크스페이스>/yolo26 (절대경로 하드코딩 제거 — clothoid-r_jg 격리 지원)
+# 커스텀 ultralytics (perception_ws/yolo26)
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "yolo26")))
 from ultralytics import YOLO
 
 logging.getLogger("ultralytics").setLevel(logging.ERROR)
 warnings.filterwarnings("ignore", category=UserWarning)
 
-# 검출 결과 영상 표시 여부 기본값 — rosparam ~show_image로 제어 (대회/headless 기본: False)
+# 검출 영상 창 표시. rosparam ~show_image 로 덮어씀 (headless 기본 False)
 SHOW_DETECTION_IMAGE = False
 
-# True 이면 검출 결과 로그 영역만 갱신해서 현재 상태만 깔끔하게 보여줍니다.
-# 초기화 로그(MODEL LOADED, pt_weights 등)는 그대로 유지됩니다.
+# True면 검출 로그를 제자리에서 갱신 (초기화 로그는 유지)
 CLEAR_TERMINAL_ON_DETECTION = False
 
 WINDOW_NAME = "YOLO BBox"
@@ -30,7 +29,7 @@ DEFAULT_SOURCE_TOPIC = "/camera/image_raw/compressed"
 DEFAULT_PUBLISH_TOPIC = "/perception/camera/yolo"
 DEFAULT_FRAME_ID = "camera_link"
 PACKAGE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-# 모델 구조는 yaml에서 만들고, checkpoint는 weight 로딩에만 사용합니다.
+# 구조는 yaml, 가중치는 checkpoint에서 로드
 DEFAULT_YAML_CFG = os.path.join(PACKAGE_DIR, "models", "best.yaml")
 DEFAULT_PT_WEIGHTS = os.path.join(PACKAGE_DIR, "models", "best.pt")
 DEFAULT_POSTPROCESS_NMS_IOU = 0.5
@@ -40,11 +39,7 @@ DEFAULT_POSTPROCESS_MAX_DET = 0
 DEFAULT_POSTPROCESS_DEBUG = False
 
 
-# 클래스별 기본 설정입니다.
-# publish 값을 True로 둔 클래스만 /perception/camera/yolo 토픽으로 publish 합니다.
-# name: 로그와 디버그 화면에 표시할 클래스 이름입니다.
-# publish: True이면 해당 클래스를 publish하고, False이면 검출되어도 버립니다.
-# confidence: 클래스별 최소 신뢰도입니다. 이 값보다 낮은 bbox는 publish하지 않습니다.
+# 클래스별 설정. publish=False 면 검출돼도 버리고, confidence 미만 bbox 는 버린다.
 DEFAULT_CLASS_CONFIG = {
     0: {
         "name": "ERP-42",
@@ -199,8 +194,7 @@ class YoloDetectNode:
         self.previous_status_line_count = 0
         global SHOW_DETECTION_IMAGE
         SHOW_DETECTION_IMAGE = bool(rospy.get_param("~show_image", SHOW_DETECTION_IMAGE))
-        # 추론 해상도. 0 = 원본 해상도(기본, 학습 해상도와 일치). 모델을 저해상도로 재학습하면
-        # 이 파라미터로 맞출 것 (실측: 960 추론 시 15.7→7.0ms, 단 학습 해상도와 불일치 상태 검증 필요)
+        # 추론 해상도. 0 = 원본(학습 해상도). 저해상도로 재학습하면 여기에 맞춘다.
         self.imgsz = int(rospy.get_param("~imgsz", 0))
         source_topic = rospy.get_param("~source", DEFAULT_SOURCE_TOPIC)
         publish_topic = rospy.get_param("~output_topic", DEFAULT_PUBLISH_TOPIC)

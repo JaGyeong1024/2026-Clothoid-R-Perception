@@ -111,10 +111,10 @@ void LivoxCameraFusion::detectionCallback(
     if (lidar_points.empty())
         return;
 
-    // raw frame 그대로 image 투영 (extrinsic이 기울임 흡수)
+    // projection 은 raw 좌표 (extrinsic 이 기울임 흡수)
     cv::perspectiveTransform(lidar_points, projected_list, projection_matrix);
 
-    // leveled frame으로 회전 + ROI (raw->leveled, projected_list 와 인덱스 동기 유지)
+    // leveled 좌표로 회전 + ROI (projected_list 와 인덱스 동기 유지)
     const double th = LIDAR_PITCH_DEG * M_PI / 180.0;
     const double c = std::cos(th), s = std::sin(th);
     std::vector<cv::Point3d> kept_points;
@@ -137,7 +137,7 @@ void LivoxCameraFusion::detectionCallback(
     if (lidar_points.empty())
         return;
 
-    // bbox 매칭 전에 전체 클라우드에서 지면 제거 (grid + RANSAC, leveled frame)
+    // 지면 제거 (grid + RANSAC)
     if (ENABLE_GROUND_REMOVAL)
     {
         remove_ground_full(lidar_points, projected_list);
@@ -173,7 +173,6 @@ void LivoxCameraFusion::convert_msg(
         if (roi->points.size() < static_cast<size_t>(CLUSTER_MIN_SIZE))
             continue;
 
-        // 지면 제거는 detectionCallback에서 전체 클라우드에 이미 적용됨
         cv::Point2d centroid;
         cv::Vec3d ext;
         if (!largest_cluster_centroid(roi, centroid, ext))
@@ -252,8 +251,7 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr LivoxCameraFusion::extract_roi(
     return roi;
 }
 
-// 전체 클라우드 지면 제거: livox_clustering의 grid(셀별 min-z) + RANSAC 평면 제거 이식.
-// pts/proj는 인덱스 동기화된 쌍이므로 같은 mask로 함께 필터링한다.
+// 전체 클라우드 지면 제거: grid(셀별 min-z) → RANSAC 평면. pts/proj 는 같은 mask 로 필터링.
 void LivoxCameraFusion::remove_ground_full(std::vector<cv::Point3d> &pts,
                                            std::vector<cv::Point2d> &proj)
 {
@@ -261,7 +259,7 @@ void LivoxCameraFusion::remove_ground_full(std::vector<cv::Point3d> &pts,
     if (n == 0)
         return;
 
-    // 1) grid: 셀별 최저 z 대비 GRID_MAX_HEIGHT_DIFF 이내 & 점 수 충분한 셀의 점 = 지면
+    // 1) grid: 셀 최저 z 대비 GRID_MAX_HEIGHT_DIFF 이내 점 = 지면 (셀 점 수 >= GRID_MIN_POINTS)
     std::map<std::pair<int, int>, std::pair<double, int>> cells; // (min_z, count)
     std::vector<std::pair<int, int>> key(n);
     for (size_t i = 0; i < n; ++i)

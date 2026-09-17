@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-# ===============================================================
-#  Velodyne PointCloud -> BEV -> YOLO v8 -> OC-SORT
-# ===============================================================
+# Velodyne PointCloud -> BEV -> YOLO -> OC-SORT
 
 import os, sys, rospy, numpy as np, cv2
 from sensor_msgs.msg import PointCloud2, PointCloud, Image
@@ -12,10 +10,10 @@ from visualization_msgs.msg import Marker, MarkerArray
 from cv_bridge import CvBridge
 from ultralytics import YOLO
 
-# OC_SORT 경로는 환경 변수로 (default: /opt/OC_SORT). launch에서 OC_SORT_PATH=... 또는 ~ocsort_path param으로 override.
+# OC_SORT 경로: env OC_SORT_PATH 또는 rosparam ~ocsort_path
 _OCSORT_DEFAULT = os.environ.get("OC_SORT_PATH", "/opt/OC_SORT")
 
-# ====================== 기본 파라미터 ==========================
+# ---- 기본 파라미터 (rosparam 으로 덮어씀) ----
 VOXEL_SIZE          = 0.05
 X_RANGE             = (-15.0, 15.0)
 Y_RANGE             = (-15.0, 15.0)
@@ -131,7 +129,7 @@ class VelodyneBevDetection:
 
         self.last_msg = PointCloud()
         self.last_msg.header.frame_id = self.frame_id
-        # 입력이 이 시간 이상 끊기면 heartbeat는 빈 메시지를 발행 (유령 장애물 방지)
+        # 입력이 stale_timeout 이상 끊기면 빈 메시지 발행 (유령 장애물 방지)
         self.stale_timeout = rospy.get_param("~stale_timeout", 0.5)
         self.last_input_time = None
         rospy.Timer(rospy.Duration(1.0 / HEARTBEAT_HZ), self.timer_cb)
@@ -142,7 +140,6 @@ class VelodyneBevDetection:
     def timer_cb(self, _):
         now = rospy.get_time()
         if self.last_input_time is None or now - self.last_input_time > self.stale_timeout:
-            # 입력 두절: 마지막 검출을 재발행하지 않고 빈 메시지로 클리어
             rospy.logwarn_throttle(2.0, "[velodyne_bev_detection] input stale (>%.1fs); publishing empty" % self.stale_timeout)
             empty = PointCloud()
             empty.header.frame_id = self.frame_id

@@ -1,9 +1,5 @@
 <launch>
-  <!--
-    velodyne_detection과 마찬가지로 시스템 python3로 실행한다.
-    필요 deps(numpy, scipy, scikit-learn)는 시스템 python3에 설치돼 있어야 함.
-    차량 PC도 동일 방식으로 동작 중.
-  -->
+  <!-- 시스템 python3 로 실행 (numpy, scipy, scikit-learn 필요) -->
   <arg name="input_topic"        default="/livox/lidar"/>
   <arg name="centroid_topic"     default="/perception/livox/centroids"/>
   <arg name="preprocessed_topic" default="/perception/livox/preprocessed"/>

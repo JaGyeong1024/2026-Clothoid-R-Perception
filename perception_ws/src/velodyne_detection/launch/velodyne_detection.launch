@@ -1,8 +1,5 @@
 <launch>
-  <!--
-    시스템 python3로 실행. ultralytics/torch/opencv는 시스템에 깔려있어야 함.
-    참고: 차량 운영은 이 launch 안 쓰고 `rosrun velodyne_detection velodyne_bev_detection.py`로 띄움.
-  -->
+  <!-- 시스템 python3 로 실행 (ultralytics, torch, opencv 필요). 차량 운영은 rosrun 사용 -->
 
   <!-- I/O -->
   <arg name="input_topic"    default="/velodyne_points"/>
