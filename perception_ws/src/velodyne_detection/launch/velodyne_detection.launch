@@ -17,7 +17,7 @@
   <arg name="detect_conf"    default="0.4"/>
   <arg name="frame_id"       default="velodyne"/>
 
-  <node pkg="velodyne_detection"
+  <node pkg="velodyne_detection" respawn="true" respawn_delay="2"
         type="velodyne_bev_detection.py"
         name="velodyne_bev_detection"
         output="screen">

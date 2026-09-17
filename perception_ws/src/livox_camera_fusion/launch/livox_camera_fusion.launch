@@ -7,7 +7,7 @@
   <arg name="frame_name"   default="livox_frame"/>
   <arg name="projection_config" default="$(find livox_camera_fusion)/config/projection.yaml"/>
 
-  <node pkg="livox_camera_fusion"
+  <node pkg="livox_camera_fusion" respawn="true" respawn_delay="2"
         type="livox_camera_fusion_node"
         name="livox_camera_fusion"
         output="screen">

@@ -34,12 +34,13 @@ GROUND_THRESH = 0.3
 
 EUCLIDEAN_MIN_CLUSTER_SIZE = 5
 CLUSTER_MERGE_GAP          = 0.5
-MAX_LENGTH, MAX_WIDTH, MAX_HEIGHT = 2.5, 2.5, 1.0
-MIN_LENGTH, MIN_WIDTH, MIN_HEIGHT = 0.5, 0.5, 0.3
+MAX_LENGTH, MAX_WIDTH, MAX_HEIGHT = 2.5, 2.5, 1.8   # H 1.0→1.8: ERP·사람 수용 (기둥은 MIN_WIDTH가 방어)
+MIN_LENGTH, MIN_WIDTH, MIN_HEIGHT = 0.3, 0.3, 0.3   # L·W 0.5→0.3: 라바콘(0.37m) 수용
 EUCLIDEAN_BASE_DIST, EUCLIDEAN_DIST_SCALE = 0.05, 0.05
 
 TRACKER_MAX_MISS = 5
 MATCH_DIST       = 1.5
+TRACKER_MIN_HITS = 3   # 이 프레임 수 이상 연속 관측된 트랙만 발행 (노이즈 억제)
 # ---------------------------------------------------------
 
 def load_algorithm_params():
@@ -48,7 +49,7 @@ def load_algorithm_params():
     global GRID_CELL_SIZE, GRID_MAX_HEIGHT_DIFF, GRID_MIN_POINTS, GROUND_THRESH
     global EUCLIDEAN_MIN_CLUSTER_SIZE, CLUSTER_MERGE_GAP
     global MAX_LENGTH, MAX_WIDTH, MAX_HEIGHT, MIN_LENGTH, MIN_WIDTH, MIN_HEIGHT
-    global EUCLIDEAN_BASE_DIST, EUCLIDEAN_DIST_SCALE, TRACKER_MAX_MISS, MATCH_DIST
+    global EUCLIDEAN_BASE_DIST, EUCLIDEAN_DIST_SCALE, TRACKER_MAX_MISS, MATCH_DIST, TRACKER_MIN_HITS
 
     PITCH_DEG = rospy.get_param("~pitch_deg", PITCH_DEG)
     ROI_X_MIN = rospy.get_param("~roi_x_min", ROI_X_MIN)
@@ -82,6 +83,7 @@ def load_algorithm_params():
 
     TRACKER_MAX_MISS = int(rospy.get_param("~tracker_max_miss", TRACKER_MAX_MISS))
     MATCH_DIST = rospy.get_param("~match_dist", MATCH_DIST)
+    TRACKER_MIN_HITS = int(rospy.get_param("~tracker_min_hits", TRACKER_MIN_HITS))
 
 # ---------- 보조 클래스 ----------
 class KalmanFilter:
@@ -107,10 +109,10 @@ class KalmanFilter:
 class Tracker:
     def __init__(self, c, tid, dt=0.1):
         self.id = tid; self.kf = KalmanFilter(dt); self.kf.update(c)
-        self.miss = 0; self.last = c
+        self.miss = 0; self.last = c; self.hits = 1
     def predict(self):
         self.last = self.kf.predict(); return self.last
-    def update(self, c): self.kf.update(c); self.last=c; self.miss=0
+    def update(self, c): self.kf.update(c); self.last=c; self.miss=0; self.hits+=1
     def no_update(self): self.kf.predict(); self.miss+=1
 
 # ---------- 유틸리티 ----------
@@ -323,7 +325,8 @@ class LivoxEuclideanClustering:
 
         observed = self._cluster_observations(pts)
         self._track(observed)
-        self.publish_centroids([t.last for t in self.trackers.values()])
+        self.publish_centroids([t.last for t in self.trackers.values()
+                                if t.hits >= TRACKER_MIN_HITS and t.miss == 0])
         rospy.logdebug(f"callback {(time.time()-start):.3f}s")
 
 # ---------- 노드 초기화 ----------

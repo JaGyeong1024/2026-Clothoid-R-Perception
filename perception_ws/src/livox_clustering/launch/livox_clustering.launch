@@ -10,7 +10,7 @@
   <arg name="frame_id"           default="livox_frame"/>
   <arg name="config"             default="$(find livox_clustering)/config/livox_clustering.yaml"/>
 
-  <node pkg="livox_clustering"
+  <node pkg="livox_clustering" respawn="true" respawn_delay="2"
         type="livox_euclidean_clustering.py"
         name="livox_euclidean_clustering"
         output="screen">

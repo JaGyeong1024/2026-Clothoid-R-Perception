@@ -137,6 +137,14 @@ void LivoxCameraFusion::detectionCallback(
     if (lidar_points.empty())
         return;
 
+    // bbox 매칭 전에 전체 클라우드에서 지면 제거 (grid + RANSAC, leveled frame)
+    if (ENABLE_GROUND_REMOVAL)
+    {
+        remove_ground_full(lidar_points, projected_list);
+        if (lidar_points.empty())
+            return;
+    }
+
     convert_msg(yolo_msg, lidar_msg->header);
 }
 
@@ -165,13 +173,10 @@ void LivoxCameraFusion::convert_msg(
         if (roi->points.size() < static_cast<size_t>(CLUSTER_MIN_SIZE))
             continue;
 
-        pcl::PointCloud<pcl::PointXYZ>::Ptr roi_ng = remove_ground_from_cloud(roi);
-        if (roi_ng->empty())
-            continue;
-
+        // 지면 제거는 detectionCallback에서 전체 클라우드에 이미 적용됨
         cv::Point2d centroid;
         cv::Vec3d ext;
-        if (!largest_cluster_centroid(roi_ng, centroid, ext))
+        if (!largest_cluster_centroid(roi, centroid, ext))
             continue;
         // 3D AABB gate (length=x, width=y, height=z)
         const double length = ext[0], width = ext[1], height = ext[2];
@@ -181,7 +186,7 @@ void LivoxCameraFusion::convert_msg(
         cur_centroids.push_back(centroid);
 
         draw_bbox_debug(box);
-        *out_cloud += *roi_ng;
+        *out_cloud += *roi;
     }
 
     prev_centroids = cur_centroids;
@@ -247,23 +252,65 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr LivoxCameraFusion::extract_roi(
     return roi;
 }
 
-pcl::PointCloud<pcl::PointXYZ>::Ptr LivoxCameraFusion::remove_ground_from_cloud(
-    const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud)
+// 전체 클라우드 지면 제거: livox_clustering의 grid(셀별 min-z) + RANSAC 평면 제거 이식.
+// pts/proj는 인덱스 동기화된 쌍이므로 같은 mask로 함께 필터링한다.
+void LivoxCameraFusion::remove_ground_full(std::vector<cv::Point3d> &pts,
+                                           std::vector<cv::Point2d> &proj)
 {
-    pcl::PointCloud<pcl::PointXYZ>::Ptr out(new pcl::PointCloud<pcl::PointXYZ>);
-    std::vector<cv::Point3f> tmp;
-    tmp.reserve(cloud->points.size());
-    for (const auto &p : *cloud)
-        tmp.emplace_back(p.x, p.y, p.z);
+    const size_t n = pts.size();
+    if (n == 0)
+        return;
 
-    const auto keep = remove_ground_ransac(tmp, GROUND_THRESH);
-    if (keep.empty())
-        return out;
+    // 1) grid: 셀별 최저 z 대비 GRID_MAX_HEIGHT_DIFF 이내 & 점 수 충분한 셀의 점 = 지면
+    std::map<std::pair<int, int>, std::pair<double, int>> cells; // (min_z, count)
+    std::vector<std::pair<int, int>> key(n);
+    for (size_t i = 0; i < n; ++i)
+    {
+        key[i] = {static_cast<int>(std::floor(pts[i].x / GRID_CELL_SIZE)),
+                  static_cast<int>(std::floor(pts[i].y / GRID_CELL_SIZE))};
+        auto it = cells.find(key[i]);
+        if (it == cells.end())
+            cells[key[i]] = {pts[i].z, 1};
+        else
+        {
+            it->second.first = std::min(it->second.first, pts[i].z);
+            it->second.second += 1;
+        }
+    }
+    std::vector<char> keep(n, 1);
+    for (size_t i = 0; i < n; ++i)
+    {
+        const auto &c = cells[key[i]];
+        if (c.second >= GRID_MIN_POINTS && pts[i].z - c.first < GRID_MAX_HEIGHT_DIFF)
+            keep[i] = 0;
+    }
 
-    out->points.reserve(keep.size());
-    for (int id : keep)
-        out->points.push_back(cloud->points[id]);
-    return out;
+    // 2) grid 통과분에 RANSAC 평면 제거
+    std::vector<cv::Point3f> rem;
+    std::vector<size_t> rem_idx;
+    rem.reserve(n);
+    for (size_t i = 0; i < n; ++i)
+        if (keep[i])
+        {
+            rem.emplace_back(pts[i].x, pts[i].y, pts[i].z);
+            rem_idx.push_back(i);
+        }
+    std::vector<char> keep2(n, 0);
+    for (int id : remove_ground_ransac(rem, GROUND_RANSAC_THRESH))
+        keep2[rem_idx[id]] = 1;
+
+    std::vector<cv::Point3d> out_pts;
+    std::vector<cv::Point2d> out_proj;
+    out_pts.reserve(n);
+    out_proj.reserve(n);
+    for (size_t i = 0; i < n; ++i)
+        if (keep2[i])
+        {
+            out_pts.push_back(pts[i]);
+            out_proj.push_back(proj[i]);
+        }
+    pts = std::move(out_pts);
+    proj = std::move(out_proj);
 }
 
 bool LivoxCameraFusion::largest_cluster_centroid(

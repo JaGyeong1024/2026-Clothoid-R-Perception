@@ -31,7 +31,6 @@
 
 /* ===== Parameters ===== */
 static constexpr double BBOX_SCALE_RATIO = 1.0;
-static constexpr double GROUND_THRESH = 0.0;
 static constexpr double CLUSTER_TOLERANCE = 0.4;
 static constexpr int CLUSTER_MIN_SIZE = 3;
 static constexpr int CLUSTER_MAX_SIZE = 100;
@@ -53,6 +52,17 @@ static constexpr double LIDAR_ROI_Y_MIN = -7.0;
 static constexpr double LIDAR_ROI_Y_MAX =  7.0;
 static constexpr double LIDAR_ROI_Z_MIN = -2.0;
 static constexpr double LIDAR_ROI_Z_MAX =  2.0;
+
+/* ===== 전체 클라우드 지면 제거 (livox_clustering 방식 이식) ===== */
+/* 기존 per-bbox RANSAC은 bbox ROI의 포인트가 적어 지배 평면이 물체(콘·ERP 하부)를 물어    */
+/* GROUND_THRESH=0으로 꺼두었었음 → 폐기. 대신 bbox 매칭 전에 전체 클라우드(leveled)에      */
+/* grid(셀별 min-z) + RANSAC 평면 제거 적용: 지면 포인트는 충분해 진짜 지면이 잡히고,      */
+/* 물체는 하부 GRID_MAX_HEIGHT_DIFF 만큼만 잃음.                                            */
+static constexpr bool   ENABLE_GROUND_REMOVAL = true;
+static constexpr double GRID_CELL_SIZE        = 0.2;
+static constexpr double GRID_MAX_HEIGHT_DIFF  = 0.2;
+static constexpr int    GRID_MIN_POINTS       = 10;
+static constexpr double GROUND_RANSAC_THRESH  = 0.2;  // livox_clustering(0.3)보다 보수적
 
 /* ===== 3D BBOX gate (cluster AABB, livox_frame: x=length, y=width, z=height) ===== */
 /* livox_clustering yaml schema와 동일 구조 — 추후 클래스별 분리할 때 확장 용이.        */
@@ -129,8 +139,8 @@ private:
         const std::vector<cv::Point2d> &matched_px,
         const pcl::PointCloud<pcl::PointXYZ>::Ptr &local,
         const cv::Point2d &center) const;
-    pcl::PointCloud<pcl::PointXYZ>::Ptr remove_ground_from_cloud(
-        const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud);
+    void remove_ground_full(std::vector<cv::Point3d> &pts,
+                            std::vector<cv::Point2d> &proj);
     bool largest_cluster_centroid(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud,
                                   cv::Point2d &centroid,
                                   cv::Vec3d &extent) const;
@@ -142,7 +152,7 @@ private:
                                    double match_dist = MATCH_DIST,
                                    int max_miss = TRACKER_MAX_MISS);
     std::vector<int> remove_ground_ransac(const std::vector<cv::Point3f> &pts,
-                                          double threshold = GROUND_THRESH);
+                                          double threshold = GROUND_RANSAC_THRESH);
 
 public:
     explicit LivoxCameraFusion(ros::NodeHandle *nh);

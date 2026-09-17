@@ -11,14 +11,15 @@ from detect_msgs.msg import Objects, Yolo_Objects
 from sensor_msgs.msg import CompressedImage
 from std_msgs.msg import Header
 
-sys.path.insert(0, "/home/cnu/clothoid-r/perception_ws/yolo26")
+# 커스텀 ultralytics: <이 워크스페이스>/yolo26 (절대경로 하드코딩 제거 — clothoid-r_jg 격리 지원)
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "yolo26")))
 from ultralytics import YOLO
 
 logging.getLogger("ultralytics").setLevel(logging.ERROR)
 warnings.filterwarnings("ignore", category=UserWarning)
 
-# True 이면 검출 결과 영상을 화면에 띄우고, False 이면 화면 출력 없이 ROS 토픽만 publish 합니다.
-SHOW_DETECTION_IMAGE = True
+# 검출 결과 영상 표시 여부 기본값 — rosparam ~show_image로 제어 (대회/headless 기본: False)
+SHOW_DETECTION_IMAGE = False
 
 # True 이면 검출 결과 로그 영역만 갱신해서 현재 상태만 깔끔하게 보여줍니다.
 # 초기화 로그(MODEL LOADED, pt_weights 등)는 그대로 유지됩니다.
@@ -196,6 +197,11 @@ class YoloDetectNode:
             for class_id, config in DEFAULT_CLASS_CONFIG.items()
         }
         self.previous_status_line_count = 0
+        global SHOW_DETECTION_IMAGE
+        SHOW_DETECTION_IMAGE = bool(rospy.get_param("~show_image", SHOW_DETECTION_IMAGE))
+        # 추론 해상도. 0 = 원본 해상도(기본, 학습 해상도와 일치). 모델을 저해상도로 재학습하면
+        # 이 파라미터로 맞출 것 (실측: 960 추론 시 15.7→7.0ms, 단 학습 해상도와 불일치 상태 검증 필요)
+        self.imgsz = int(rospy.get_param("~imgsz", 0))
         source_topic = rospy.get_param("~source", DEFAULT_SOURCE_TOPIC)
         publish_topic = rospy.get_param("~output_topic", DEFAULT_PUBLISH_TOPIC)
         yaml_cfg = rospy.get_param("~yaml_cfg", DEFAULT_YAML_CFG)
@@ -310,7 +316,8 @@ class YoloDetectNode:
         frame = cv2.imdecode(np.frombuffer(msg.data, np.uint8), cv2.IMREAD_COLOR)
         h0, w0 = frame.shape[:2]
 
-        results = self.model(frame, imgsz=(h0, w0), conf=self.conf_thres)[0]
+        imgsz = self.imgsz if self.imgsz > 0 else (h0, w0)
+        results = self.model(frame, imgsz=imgsz, conf=self.conf_thres)[0]
 
         frame_id = msg.header.frame_id if msg.header.frame_id else self.frame_id
         out = Yolo_Objects()

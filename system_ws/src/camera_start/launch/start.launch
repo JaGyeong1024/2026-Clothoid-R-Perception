@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <launch>
-	<node name="camera_start_node" pkg="camera_start" type="camera_start_node" output="screen">
+	<node name="camera_start_node" pkg="camera_start" type="camera_start_node" output="screen" respawn="true" respawn_delay="2">
 		<param name="fx" value="1.9740e+03" />
 		<param name="fy" value="1.9718e+03" />
 		<param name="cx" value="0.9636e+03" />

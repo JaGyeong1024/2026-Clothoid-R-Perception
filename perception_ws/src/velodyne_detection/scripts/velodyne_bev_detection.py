@@ -90,7 +90,8 @@ class VelodyneBevDetection:
         from trackers.ocsort_tracker.ocsort import OCSort
 
         # Model
-        model_path = rospy.get_param("~model_path", "/home/cnu/clothoid-r/perception_ws/src/velodyne_detection/model/velodyne_v6.pt")
+        model_path = rospy.get_param("~model_path", os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "..", "model", "velodyne_v6.pt"))
         if not model_path:
             rospy.logerr("[velodyne_bev_detection] ~model_path not set")
             raise RuntimeError("~model_path is required")
@@ -130,12 +131,25 @@ class VelodyneBevDetection:
 
         self.last_msg = PointCloud()
         self.last_msg.header.frame_id = self.frame_id
+        # 입력이 이 시간 이상 끊기면 heartbeat는 빈 메시지를 발행 (유령 장애물 방지)
+        self.stale_timeout = rospy.get_param("~stale_timeout", 0.5)
+        self.last_input_time = None
         rospy.Timer(rospy.Duration(1.0 / HEARTBEAT_HZ), self.timer_cb)
 
         rospy.loginfo(f"[velodyne_bev_detection] subscribe={input_topic} "
                       f"-> centroids={centroid_topic}")
 
     def timer_cb(self, _):
+        now = rospy.get_time()
+        if self.last_input_time is None or now - self.last_input_time > self.stale_timeout:
+            # 입력 두절: 마지막 검출을 재발행하지 않고 빈 메시지로 클리어
+            rospy.logwarn_throttle(2.0, "[velodyne_bev_detection] input stale (>%.1fs); publishing empty" % self.stale_timeout)
+            empty = PointCloud()
+            empty.header.frame_id = self.frame_id
+            empty.header.stamp = rospy.Time.now()
+            self.pcl_pub.publish(empty)
+            self.last_msg = empty
+            return
         self.last_msg.header.stamp = rospy.Time.now()
         self.pcl_pub.publish(self.last_msg)
 
@@ -162,6 +176,7 @@ class VelodyneBevDetection:
         return cv2.merge([d,i,h])
 
     def lidar_cb(self, msg: PointCloud2):
+        self.last_input_time = rospy.get_time()
         pts = parse_xyzi_points(msg)
 
         bev = self.pc2_to_bev(pts)
