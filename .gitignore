@@ -3,6 +3,9 @@
 !/.gitignore
 !/README.md
 !/docs/
+!/tools/
+/tools/*
+!/tools/gen_pipeline_drawio.py
 !/perception_ws/
 !/system_ws/
 !/2026_pipeline.drawio
