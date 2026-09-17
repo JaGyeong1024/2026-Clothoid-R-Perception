@@ -27,7 +27,10 @@ Clothoid-R 자율주행 시스템의 Perception ROS workspace.
   <a href="https://github.com/Minjea31"><img src="https://avatars.githubusercontent.com/u/80508437?v=4" width="100px;" alt=""/><br /><sub><b>김민재</b></sub></a><br />Computer Vision, <br />DL Pruning
 </td>
 <td align="center" width="180">
-  <a href="https://github.com/namgyu021210"><img src="https://avatars.githubusercontent.com/u/203391491?v=4" width="100px;" alt=""/><br /><sub><b>이남규</b></sub></a><br />Attacker
+  <a href="https://github.com/esem5377"><img src="https://avatars.githubusercontent.com/u/268164639?v=4" width="100px;" alt=""/><br /><sub><b>김은수</b></sub></a><br />Computer Vision, <br />Model Optimization
+</td>
+<td align="center" width="180">
+  <a href="https://github.com/ysjee0229"><img src="https://avatars.githubusercontent.com/u/187412639?v=4" width="100px;" alt=""/><br /><sub><b>지연수</b></sub></a><br />Computer Vision, <br />Model Optimization
 </td>
 </tr>
 </table>
