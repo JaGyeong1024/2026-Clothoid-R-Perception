@@ -10,7 +10,7 @@ Livox LiDAR + 카메라 YOLO 결과를 시간 동기화하여 객체의 중점 �
 |---|---|---|
 | `/livox/lidar` | `sensor_msgs/PointCloud2` | Livox 포인트클라우드 |
 | `/camera/image_raw/compressed` | `sensor_msgs/CompressedImage` | 카메라 RGB |
-| `/perception/camera/yolo` | `detect_msgs/Yolo_Objects` | yolov12 노드의 bbox 결과 |
+| `/perception/camera/yolo` | `detect_msgs/Yolo_Objects` | yolo26 노드의 bbox 결과 |
 
 세 토픽은 `message_filters::ApproximateTime`(slop 50ms)으로 동기화.
 
@@ -27,7 +27,7 @@ Livox LiDAR + 카메라 YOLO 결과를 시간 동기화하여 객체의 중점 �
 |---|---|---|
 | `lidar_topic` | `/livox/lidar` | 입력 LiDAR 토픽 |
 | `camera_topic` | `/camera/image_raw/compressed` | 입력 카메라 토픽 |
-| `yolo_topic` | `/perception/camera/yolo` | yolov12 결과 토픽 |
+| `yolo_topic` | `/perception/camera/yolo` | yolo26 결과 토픽 |
 | `centroid_topic` | `/perception/fusion/centroids` | 출력 centroid 토픽 |
 | `filtered_cloud_topic` | `/perception/fusion/filtered_cloud` | 출력 필터링 cloud 토픽 |
 | `frame_name` | `livox_frame` | 출력 PointCloud frame_id |

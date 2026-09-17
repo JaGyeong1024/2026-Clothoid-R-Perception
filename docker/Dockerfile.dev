@@ -1,0 +1,30 @@
+# 개발용 — base 위에 무거운 파이썬 스택을 얹는다. 팀원이 각자 로컬에서 빌드한다.
+# 레이어로 굳으므로 `docker run --rm` 을 써도 매번 다시 받지 않는다.
+#
+# Build: ./docker/clothoid.sh build
+#
+# torch 계열 휠은 하나가 400~800 MB 라 회선이 흔들리면 중간에 끊긴다.
+# pip 캐시를 BuildKit 캐시 마운트에 두어 재시도 시 받아둔 휠을 다시 쓰고
+# (이미지 레이어에는 남지 않는다), 재시도 횟수도 늘려 잡는다.
+ARG BASE=ghcr.io/jagyeong1024/clothoid-r-perception:base
+FROM ${BASE}
+
+# 시스템 pip 은 20.0.2 라 --resume-retries(pip 25.1+) 를 모른다. 플래그를 나눠 쓴다.
+ARG PIP_NET="--retries 10 --timeout 60"
+ARG PIP_NET_NEW="--retries 10 --timeout 60 --resume-retries 10"
+
+USER root
+COPY requirements-system.txt /tmp/
+RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
+    python3 -m pip install ${PIP_NET} -r /tmp/requirements-system.txt \
+    && rm /tmp/requirements-system.txt
+
+USER cnu
+COPY --chown=cnu:cnu requirements-yolo.txt /tmp/
+RUN --mount=type=cache,target=/home/cnu/.cache/pip,uid=1000,gid=1000,sharing=locked \
+    /home/cnu/anaconda3/envs/yolo/bin/python -m pip install ${PIP_NET_NEW} \
+      -r /tmp/requirements-yolo.txt \
+    && rm /tmp/requirements-yolo.txt
+
+WORKDIR /home/cnu/clothoid-r-perception
+CMD ["/bin/bash"]

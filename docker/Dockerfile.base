@@ -1,0 +1,67 @@
+# clothoid-r-perception base — OS + ROS Noetic + 빌드 의존성만 담는다.
+# torch 같은 무거운 파이썬 스택은 여기 넣지 않는다. Dockerfile.dev가
+# requirements-*.txt로 설치하므로, 이 이미지는 거의 안 바뀌고 팀원은 한 번만 받는다.
+#
+# Build: docker build -f docker/Dockerfile.base -t clothoid-r-perception:base .
+FROM ros:noetic-ros-base-focal
+
+ARG USER_NAME=cnu
+ARG USER_UID=1000
+ARG USER_GID=1000
+ARG CONDA_DIR=/home/cnu/anaconda3
+
+ENV DEBIAN_FRONTEND=noninteractive
+SHELL ["/bin/bash", "-c"]
+
+# perception_ws / system_ws 의 package.xml 이 요구하는 ROS 패키지와
+# 드라이버 빌드 의존성(livox=apr/pcap, velodyne=pcap/yaml-cpp).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      ros-noetic-rviz \
+      ros-noetic-cv-bridge ros-noetic-image-transport ros-noetic-message-filters \
+      ros-noetic-pcl-ros ros-noetic-pcl-conversions \
+      ros-noetic-dynamic-reconfigure ros-noetic-diagnostic-updater \
+      ros-noetic-nodelet ros-noetic-angles ros-noetic-tf ros-noetic-tf2-ros \
+      ros-noetic-roslint ros-noetic-rosbag ros-noetic-jsk-recognition-msgs \
+      python3-catkin-tools python3-rosdep python3-pip python3-dev \
+      libpcap-dev libapr1-dev libyaml-cpp-dev \
+      libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
+      build-essential cmake git curl wget ca-certificates bzip2 \
+      sudo vim tmux net-tools iputils-ping \
+    && rm -rf /var/lib/apt/lists/*
+
+# 차량(cnu)과 동일한 UID/경로를 만든다. yolo_detect.py 의 shebang
+# `#!/home/cnu/anaconda3/envs/yolo/bin/python` 가 그대로 풀리고,
+# 호스트에서 bind-mount 한 파일의 소유자도 어긋나지 않는다.
+RUN set -eux; \
+    if id -u ubuntu >/dev/null 2>&1; then userdel -r ubuntu 2>/dev/null || userdel ubuntu; fi; \
+    if ! getent group ${USER_GID} >/dev/null; then groupadd -g ${USER_GID} ${USER_NAME}; fi; \
+    useradd -ms /bin/bash -u ${USER_UID} -g ${USER_GID} ${USER_NAME}; \
+    echo "${USER_NAME} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers; \
+    install -d -o ${USER_NAME} -g ${USER_NAME} /home/${USER_NAME}/clothoid-r-perception
+
+# velodyne_detection 이 import 하는 트래커. launch 기본값이 /opt/OC_SORT 다.
+# 차량(cnu)의 /opt/OC_SORT 와 같은 커밋으로 고정한다. 최신을 받으면 트래커
+# 동작이 달라질 수 있고, exps/ 같은 하위 디렉토리 구성도 어긋난다.
+ARG OCSORT_REF=7a390a5f35dbbb45df6cd584588c216aea527248
+RUN git clone https://github.com/noahcao/OC_SORT.git /opt/OC_SORT \
+    && git -C /opt/OC_SORT checkout --detach ${OCSORT_REF} \
+    && rm -rf /opt/OC_SORT/.git
+
+# python 3.10 인터프리터 껍데기만 만든다. 패키지는 Dockerfile.dev 담당.
+# 경로를 차량과 똑같이 ${CONDA_DIR}(=/home/cnu/anaconda3) 로 두어야
+# yolo_detect.py 의 shebang 이 그대로 풀린다.
+# Anaconda 배포본 대신 Miniforge 를 쓴다 — defaults 채널은 ToS 동의를
+# 요구하고 상용 라이선스 조항이 걸려 있어 팀/기관 배포에 부적합하다.
+# conda-forge 만 쓰므로 동작은 같고 라이선스 제약이 없다.
+USER ${USER_NAME}
+RUN wget -q https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh -O /tmp/mf.sh \
+    && bash /tmp/mf.sh -b -p ${CONDA_DIR} \
+    && rm /tmp/mf.sh \
+    && ${CONDA_DIR}/bin/conda create -y -n yolo -c conda-forge --override-channels python=3.10 \
+    && ${CONDA_DIR}/bin/conda clean -afy
+
+# conda 를 PATH 에 올리지 않는다. 차량과 동일하게 `python3` 는 시스템 3.8 이어야
+# 하고(rospy, livox/velodyne 노드), yolo env 는 절대경로 shebang 으로만 쓴다.
+ENV CONDA_DIR=${CONDA_DIR}
+WORKDIR /home/${USER_NAME}/clothoid-r-perception
+CMD ["/bin/bash"]

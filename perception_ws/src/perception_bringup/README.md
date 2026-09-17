@@ -15,11 +15,11 @@ roslaunch perception_bringup perception.launch
 | `livox_camera_fusion` | livox_camera_fusion | 시스템 (C++ 노드) |
 | `livox_euclidean_clustering` | livox_clustering | 시스템 python3 |
 
-`velodyne_detection`, `yolov12`는 환경 격리 / 차량 운영 방식에 맞춰 이 launch에서 분리되어 있음. 별도 터미널에서:
+`velodyne_detection`, `yolo26`은 환경 격리 / 차량 운영 방식에 맞춰 이 launch에서 분리되어 있음. 별도 터미널에서:
 
 ```bash
 rosrun velodyne_detection velodyne_bev_detection.py   # 시스템 python3
-rosrun yolov12 yolo_detect.py                         # conda yolo env (shebang)
+rosrun yolo26 yolo_detect.py                         # conda yolo env (shebang)
 ```
 
 ## Launch arguments

@@ -1,0 +1,36 @@
+# conda `yolo` env(python 3.10) 런타임 의존성 — yolo26 노드용.
+# 버전은 대회 주행에 쓰인 cnu PC(`pip freeze`, 2026-09-17)에서 그대로 뽑은 값.
+# 커스텀 ultralytics는 레포 안(perception_ws/yolo26)에 있고 yolo_detect.py가
+# 스크립트 상대경로로 import하므로 여기에 설치하지 않는다.
+
+--extra-index-url https://download.pytorch.org/whl/cu121
+
+torch==2.5.1+cu121
+torchvision==0.20.1+cu121
+torchaudio==2.5.1+cu121
+
+numpy==1.26.4
+opencv-python==4.9.0.80
+pillow==10.4.0
+scipy==1.13.0
+PyYAML==6.0.1
+psutil==5.9.8
+py-cpuinfo==9.0.0
+supervision==0.22.0
+timm==1.0.14
+albumentations==2.0.4
+pycocotools==2.0.7
+huggingface-hub==0.23.2
+safetensors==0.4.3
+
+# ONNX 변환 / 추론 최적화 작업용
+onnx==1.14.0
+onnxruntime==1.15.1
+onnxruntime-gpu==1.18.0
+onnxslim==0.1.31
+
+# 커스텀 ultralytics의 torch_utils.py가 하드 import
+ultralytics-thop==2.0.19
+
+# yolo_detect.py의 rospy import
+rospkg==1.6.1

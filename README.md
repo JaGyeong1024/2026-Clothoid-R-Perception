@@ -76,12 +76,57 @@ Clothoid-R 자율주행 시스템의 Perception ROS workspace.
 
 ## Requirements
 
-- Ubuntu 20.04
-- ROS Noetic
-- Git
-- NVIDIA GPU/CUDA, optional
+Host requirements for the Docker workflow (recommended):
 
-## Setup
+| Item | Requirement |
+|---|---|
+| OS | Ubuntu (host version does not matter — the container ships 20.04) |
+| GPU | NVIDIA GPU, driver **535 or newer** (required by the cu121 torch wheels) |
+| Docker | Docker Engine + [nvidia-container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) |
+| Git | |
+| Disk | **20 GB** free |
+
+macOS is not supported (no NVIDIA GPU). Windows works through WSL2 + Docker Desktop but needs extra setup for GUI and GPU passthrough.
+
+For a native install instead, you need Ubuntu 20.04 + ROS Noetic — see Native Setup below.
+
+## Docker (recommended)
+
+Reproduces the vehicle (cnu) environment. Nothing is installed on the host.
+
+```bash
+git clone https://github.com/JaGyeong1024/2026-Clothoid-R-Perception.git
+cd 2026-Clothoid-R-Perception
+
+./docker/clothoid.sh build     # first time only: pull base image + install python deps (10-20 min)
+./docker/clothoid.sh           # enter the container; this is all you need afterwards
+```
+
+The container persists. Running the script from several terminals attaches to the **same container**, so you can start each node in its own terminal exactly as on the vehicle.
+
+The repo is mounted at `/home/cnu/clothoid-r-perception` inside the container. **Edit on the host, build and run in the container.** Update code with `git pull` on the host.
+
+| Command | Action |
+|---|---|
+| `./docker/clothoid.sh` | Enter (creates the container if missing, starts it if stopped) |
+| `./docker/clothoid.sh build` | Build the dev image |
+| `./docker/clothoid.sh stop` | Stop the container |
+| `./docker/clothoid.sh rm` | Remove the container (image is kept) |
+
+Layout:
+
+| File | Contents |
+|---|---|
+| `docker/Dockerfile.base` | Ubuntu 20.04 + ROS Noetic + build dependencies. This is the image published to the registry |
+| `docker/Dockerfile.dev` | base + the python stack. Built locally by each developer |
+| `docker/requirements-system.txt` | System python3.8 pins (livox_clustering, velodyne_detection) |
+| `docker/requirements-yolo.txt` | conda `yolo` env python3.10 pins (yolo26) |
+
+The pins were taken from `pip freeze` on the cnu PC used for the competition run (2026-09-17). To change a dependency, edit the requirements file — the base image does not need to be rebuilt.
+
+Sensors are not available inside the container, so develop against rosbags. Note that the pipeline is verified by building all 15 packages in the container; sensor-dependent behaviour still has to be checked on the vehicle.
+
+## Native Setup
 
 ROS environment:
 

@@ -53,8 +53,9 @@ PointCloud2 read (intensity 있으면 사용)
 
 | 파일 | 용도 |
 |---|---|
-| `velodyne_v4.pt` | 현재 launch 기본값 |
-| `velodyne_v5.pt`, `velodyne_v6.pt` | 이전 버전 fallback |
+| `velodyne_v6.pt` | 유일한 가중치. launch(`model_version`)와 스크립트 기본값 모두 v6 |
+
+이전 버전(`velodyne_v4.pt`, `velodyne_v5.pt`)은 참조되지 않아 제거했다. 필요하면 git 히스토리에서 복구한다.
 
 launch에서 `model_version` arg로 선택:
 ```bash

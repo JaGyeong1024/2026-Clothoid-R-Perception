@@ -1,0 +1,22 @@
+# 시스템 python3.8 런타임 의존성 — livox_clustering, velodyne_detection 노드용.
+# 버전은 대회 주행에 쓰인 cnu PC(`pip freeze`, 2026-09-17)에서 그대로 뽑은 값.
+# torch 2.4.1 PyPI 기본 휠이 cu121 번들이라 별도 index 불필요.
+
+torch==2.4.1
+torchvision==0.19.1
+torchaudio==2.4.1
+
+ultralytics==8.0.196
+thop==0.1.1.post2209072238
+
+numpy==1.24.4
+opencv-python==4.8.0.76
+scikit-learn==1.3.2
+scipy==1.10.1
+Pillow==10.0.0
+typing-extensions==4.13.2
+
+# OC_SORT 트래커
+filterpy==1.4.5
+lap==0.5.12
+lapx==0.5.5
