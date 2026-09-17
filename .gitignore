@@ -1,83 +1,12 @@
-# ===== catkin / ROS build artifacts =====
-build/
-devel/
-install/
-log/
-logs/
-.catkin_tools/
-*.bag
-*.bag.active
-*_bag/
-bag/
-bags/
+# 기본적으로 최상위 항목을 모두 무시
+/*
 
-# ===== Python =====
+# 추적할 항목만 예외로 허용
+!/.gitignore
+!/README.md
+!/perception_ws/
+!/system_ws/
+
+# 추적 대상 안에서도 파이썬 캐시는 무시
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
-*.egg
-*.egg-info/
-.eggs/
-.Python
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.ipynb_checkpoints/
-.venv/
-venv/
-env/
-
-# ===== C/C++ build artifacts =====
-*.o
-*.obj
-*.a
-*.lib
-*.dll
-*.dylib
-*.exe
-*.out
-CMakeCache.txt
-CMakeFiles/
-cmake_install.cmake
-Makefile
-compile_commands.json
-
-# ===== Editors / IDEs =====
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.DS_Store
-Thumbs.db
-
-# ===== AI agents / assistants =====
-.claude/
-.codex/
-.agents/
-.cursor/
-.aider*
-.continue/
-
-# ===== Docker (local-only env mirroring vehicle PC) =====
-Dockerfile
-.dockerignore
-docker_perception.sh
-
-# ===== Local-only dev tools (정식 calibration/통합 후 교체) =====
-src/perception_bringup/launch/tf_static.launch
-src/perception_bringup/scripts/merge_centroids.py
-test.sh
-0522.rviz
-IMPROVEMENTS.md
-
-# ===== draw.io / seminar assets =====
-*.drawio
-2026_pipeline.png
-
-# ===== Misc =====
-*.log
-*.tmp
-*.bak
-core
+*.pyc

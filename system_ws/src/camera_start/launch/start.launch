@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<launch>
+	<node name="camera_start_node" pkg="camera_start" type="camera_start_node" output="screen">
+		<param name="fx" value="1.9740e+03" />
+		<param name="fy" value="1.9718e+03" />
+		<param name="cx" value="0.9636e+03" />
+		<param name="cy" value="0.5849e+03" />
+		<param name="k1" value="0.0177" />
+		<param name="k2" value="0.0817" />
+		<param name="p1" value="0.00" />
+		<param name="p2" value="0.00" />
+	</node>
+</launch>
