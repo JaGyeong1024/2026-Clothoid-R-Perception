@@ -108,12 +108,12 @@ def pkg(label, fill, nid_h, extra=None, x=PX):
 vb_h = 30 + 40 + 15 * 5 + 16
 n_vb = node("velodyne_bev_detection", "BEV-based LiDAR DL detection",
             ["Voxel BEV raster", "YOLO (velodyne_v6.pt)", "OC-SORT tracker", "stale-input heartbeat"], PX, R1 - vb_h // 2)[0]
-pkg("velodyne_detection", "#d5e8d4", (n_vb, vb_h), "also: /perception/velodyne/markers [MarkerArray], bev_image [Image]")
+pkg("velodyne_detection", "#d5e8d4", (n_vb, vb_h))
 
 cl_h = 30 + 40 + 15 * 6 + 16
 n_cl = node("livox_euclidean_clustering", "Euclidean clustering on Livox cloud",
             ["pitch calib / ROI", "voxel + DROR", "ground removal (grid + RANSAC)", "euclidean clustering + size gate", "KF tracking (min_hits gate)"], PX, R2 - cl_h // 2)[0]
-pkg("livox_clustering", "#e1d5e7", (n_cl, cl_h), "also: /perception/livox/preprocessed [PointCloud2]")
+pkg("livox_clustering", "#e1d5e7", (n_cl, cl_h))
 
 yo_h = 30 + 40 + 15 * 5 + 16
 n_yo = node("yolo_detect_node", "YOLO26 pruned camera detection",
@@ -126,7 +126,7 @@ LIV_FUS_Y = 600
 fu_y = LIV_FUS_Y - fu_h // 4
 n_fu = node("livox_camera_fusion_node", "Livox-camera YOLO fusion",
             ["ApproxTime sync", "LiDAR → camera projection", "ground removal (grid + RANSAC)", "YOLO bbox ROI clustering", "3D size gate + KF tracking"], FX, fu_y)[0]
-pkg("livox_camera_fusion", "#fff2cc", (n_fu, fu_h), "also: /perception/fusion/filtered_cloud [PointCloud2]", x=FX)
+pkg("livox_camera_fusion", "#fff2cc", (n_fu, fu_h), x=FX)
 fu_in = [fu_y + fu_h * k for k in (0.25, 0.5, 0.75)]
 
 # planning: local_path 노드. 왼쪽 변 1/2 가 clustering 행 중심(R2)에 오도록
