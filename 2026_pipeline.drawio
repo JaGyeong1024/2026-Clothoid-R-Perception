@@ -1,0 +1,218 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="페이지-1" id="WV4qWqokzlq5mtiF9p0e">
+    <mxGraphModel dx="1371" dy="2437" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-57" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="" vertex="1">
+          <mxGeometry height="1120" width="1560" y="-120" as="geometry" />
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-11" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;verticalAlign=top;align=left;fontSize=14;fontStyle=1;spacingLeft=12;spacingTop=8;movable=1;resizable=1;rotatable=1;deletable=1;editable=1;locked=0;connectable=1;" value="perception_ws" vertex="1">
+          <mxGeometry height="880" width="960" x="200" as="geometry" />
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=none;fontSize=12;fontStyle=1;" value="&lt;font&gt;Velodyne&lt;br&gt;VLP-16 LiDAR&lt;/font&gt;" vertex="1">
+          <mxGeometry height="80" width="120" x="40" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=none;fontSize=12;fontStyle=1;" value="&lt;font&gt;Livox&lt;br&gt;Horizon LiDAR&lt;/font&gt;" vertex="1">
+          <mxGeometry height="80" width="120" x="40" y="400" as="geometry" />
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-4" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=none;fontSize=12;fontStyle=1;" value="&lt;font&gt;SF3324-100&lt;br&gt;Camera&lt;/font&gt;" vertex="1">
+          <mxGeometry height="80" width="120" x="40" y="680" as="geometry" />
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-10" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=none;verticalAlign=top;align=left;fontSize=12;fontStyle=1;spacingLeft=10;spacingTop=6;" value="velodyne_detection" vertex="1">
+          <mxGeometry height="240" width="320" x="280" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-5" parent="1" style="swimlane;fontStyle=0;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;strokeColor=default;" value="&lt;b style=&quot;font-size: 11px; text-align: left;&quot;&gt;velodyne_bev_detection&lt;/b&gt;" vertex="1">
+          <mxGeometry height="140" width="160" x="360" y="90" as="geometry" />
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-9" parent="2qpVZMzO5_dhKtPInlzN-5" style="text;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;whiteSpace=wrap;html=1;fillColor=default;strokeColor=default;" value="&lt;font style=&quot;font-size: 10px;&quot;&gt;Description:&lt;br style=&quot;&quot;&gt;BEV-based LiDAR DL detection&lt;/font&gt;" vertex="1">
+          <mxGeometry height="40" width="160" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-7" parent="2qpVZMzO5_dhKtPInlzN-5" style="text;strokeColor=default;fillColor=default;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;whiteSpace=wrap;html=1;" value="&lt;font style=&quot;font-size: 10px;&quot;&gt;function:&lt;br style=&quot;&quot;&gt;- Voxel BEV&lt;br style=&quot;&quot;&gt;- YOLOv8&lt;br style=&quot;&quot;&gt;- OC-SORT Tracker&lt;/font&gt;" vertex="1">
+          <mxGeometry height="70" width="160" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-12" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=none;verticalAlign=top;align=left;fontSize=12;fontStyle=1;spacingLeft=10;spacingTop=6;" value="livox_clustering" vertex="1">
+          <mxGeometry height="240" width="320" x="280" y="320" as="geometry" />
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-13" parent="1" style="swimlane;fontStyle=0;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;strokeColor=default;fontSize=12;" value="&lt;b style=&quot;text-align: left;&quot;&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;livox_euclidean_clustering&lt;/font&gt;&lt;/b&gt;" vertex="1">
+          <mxGeometry height="170" width="170" x="355" y="360" as="geometry" />
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-14" parent="2qpVZMzO5_dhKtPInlzN-13" style="text;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;whiteSpace=wrap;html=1;fillColor=default;strokeColor=default;" value="&lt;font style=&quot;font-size: 10px;&quot;&gt;Description:&lt;br style=&quot;&quot;&gt;Euclidean clustering on Livox cloud&lt;/font&gt;" vertex="1">
+          <mxGeometry height="50" width="170" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-15" parent="2qpVZMzO5_dhKtPInlzN-13" style="text;strokeColor=default;fillColor=default;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;whiteSpace=wrap;html=1;" value="&lt;font style=&quot;font-size: 10px;&quot;&gt;function:&lt;br style=&quot;&quot;&gt;- Pitch calib&lt;br style=&quot;&quot;&gt;- ROI&lt;br style=&quot;&quot;&gt;- Voxel DROR&lt;br style=&quot;&quot;&gt;- Ground Remove (RANSAC)&lt;br style=&quot;&quot;&gt;- Euclidean Clustering&lt;/font&gt;" vertex="1">
+          <mxGeometry height="90" width="170" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-16" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=none;verticalAlign=top;align=left;fontSize=12;fontStyle=1;spacingLeft=10;spacingTop=6;" value="yolov8" vertex="1">
+          <mxGeometry height="240" width="320" x="280" y="600" as="geometry" />
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-17" parent="1" style="swimlane;fontStyle=0;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;strokeColor=default;fontSize=12;" value="&lt;b style=&quot;font-size: 11px; text-align: left;&quot;&gt;camera_yolo_detection&lt;/b&gt;" vertex="1">
+          <mxGeometry height="160" width="170" x="355" y="640" as="geometry" />
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-18" parent="2qpVZMzO5_dhKtPInlzN-17" style="text;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;whiteSpace=wrap;html=1;fillColor=default;strokeColor=default;" value="&lt;font style=&quot;font-size: 10px;&quot;&gt;Description:&lt;br style=&quot;&quot;&gt;YOLOv8 Pruned camera detection&lt;/font&gt;" vertex="1">
+          <mxGeometry height="40" width="170" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-19" parent="2qpVZMzO5_dhKtPInlzN-17" style="text;strokeColor=default;fillColor=default;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;whiteSpace=wrap;html=1;" value="&lt;font style=&quot;font-size: 10px;&quot;&gt;function:&lt;br style=&quot;&quot;&gt;- Pruned YOLOv8 inference&lt;br style=&quot;&quot;&gt;- 2D BBox publish&lt;/font&gt;" vertex="1">
+          <mxGeometry height="90" width="170" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-20" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=none;verticalAlign=top;align=left;fontSize=12;fontStyle=1;spacingLeft=10;spacingTop=6;" value="livox_camera_fusion" vertex="1">
+          <mxGeometry height="240" width="320" x="760" y="600" as="geometry" />
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-21" parent="1" style="swimlane;fontStyle=0;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;strokeColor=default;fontSize=12;" value="&lt;b style=&quot;font-size: 11px; text-align: left;&quot;&gt;livox_camera_fusion_node&lt;/b&gt;" vertex="1">
+          <mxGeometry height="160" width="170" x="835" y="640" as="geometry" />
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-22" parent="2qpVZMzO5_dhKtPInlzN-21" style="text;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;whiteSpace=wrap;html=1;fillColor=default;strokeColor=default;" value="&lt;font style=&quot;font-size: 10px;&quot;&gt;Description:&lt;br style=&quot;&quot;&gt;Livox-camera YOLO fusion&lt;/font&gt;" vertex="1">
+          <mxGeometry height="40" width="170" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-23" parent="2qpVZMzO5_dhKtPInlzN-21" style="text;strokeColor=default;fillColor=default;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;whiteSpace=wrap;html=1;" value="&lt;font style=&quot;font-size: 10px;&quot;&gt;function:&lt;br style=&quot;&quot;&gt;- ApproxTime Sync&lt;br style=&quot;&quot;&gt;- LiDAR → Camera projection&lt;br style=&quot;&quot;&gt;- YOLO bbox filtering&lt;br style=&quot;&quot;&gt;- RANSAC&lt;br style=&quot;&quot;&gt;- Clustering&lt;/font&gt;" vertex="1">
+          <mxGeometry height="90" width="170" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-25" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;verticalAlign=top;align=left;fontSize=14;fontStyle=1;spacingLeft=12;spacingTop=8;" value="planning_ws" vertex="1">
+          <mxGeometry height="160" width="279" x="1241" y="360" as="geometry" />
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-26" parent="1" style="swimlane;fontStyle=0;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;strokeColor=default;fontSize=12;" value="&lt;b style=&quot;font-size: 11px; text-align: left;&quot;&gt;local_path_node&lt;/b&gt;" vertex="1">
+          <mxGeometry height="70" width="170" x="1295.5" y="410" as="geometry" />
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-27" parent="2qpVZMzO5_dhKtPInlzN-26" style="text;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;whiteSpace=wrap;html=1;fillColor=default;strokeColor=default;" value="&lt;font style=&quot;font-size: 10px;&quot;&gt;Description:&lt;br style=&quot;&quot;&gt;local path generation&lt;/font&gt;" vertex="1">
+          <mxGeometry height="40" width="170" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-30" edge="1" parent="1" source="2qpVZMzO5_dhKtPInlzN-2" style="endArrow=classic;html=1;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;fillColor=#0050ef;strokeColor=#001DBC;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="260" y="390" as="sourcePoint" />
+            <mxPoint x="360" y="160" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-31" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontStyle=1" value="&lt;font style=&quot;font-size: 10px;&quot;&gt;/velodyne_points&lt;/font&gt;&lt;div&gt;&lt;font style=&quot;font-size: 10px;&quot;&gt;[10Hz][PointCloud2]&lt;/font&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="30" width="100" x="180" y="125" as="geometry" />
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-32" edge="1" parent="1" source="2qpVZMzO5_dhKtPInlzN-3" style="endArrow=classic;html=1;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;fillColor=#0050ef;strokeColor=#001DBC;entryX=0;entryY=0.001;entryDx=0;entryDy=0;entryPerimeter=0;" target="2qpVZMzO5_dhKtPInlzN-15" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="190" y="400" as="sourcePoint" />
+            <mxPoint x="350" y="440" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-33" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontStyle=1" value="&lt;font style=&quot;font-size: 10px;&quot;&gt;/livox/lidar&lt;/font&gt;&lt;div&gt;&lt;font style=&quot;font-size: 10px;&quot;&gt;[10Hz][PointCloud2]&lt;/font&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="30" width="100" x="164" y="404" as="geometry" />
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-34" edge="1" parent="1" source="2qpVZMzO5_dhKtPInlzN-4" style="endArrow=classic;html=1;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;fillColor=#d80073;strokeColor=#A50040;entryX=0.004;entryY=0.105;entryDx=0;entryDy=0;entryPerimeter=0;" target="2qpVZMzO5_dhKtPInlzN-19" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="280" y="490" as="sourcePoint" />
+            <mxPoint x="470" y="490" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-35" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontStyle=1" value="&lt;span style=&quot;font-size: 10px;&quot;&gt;/camera/image_raw/compressed&lt;/span&gt;&lt;div&gt;&lt;span style=&quot;font-size: 10px;&quot;&gt;[CompressedImage]&lt;/span&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="30" width="170" x="170" y="685" as="geometry" />
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-36" edge="1" parent="1" source="2qpVZMzO5_dhKtPInlzN-5" style="endArrow=classic;html=1;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;fillColor=#0050ef;strokeColor=#000000;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="2qpVZMzO5_dhKtPInlzN-26" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <Array as="points">
+              <mxPoint x="1380" y="160" />
+            </Array>
+            <mxPoint x="290" y="170" as="sourcePoint" />
+            <mxPoint x="1380" y="160" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-37" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontStyle=1" value="&lt;span style=&quot;font-size: 10px;&quot;&gt;/perception/velodyne/centroids&lt;/span&gt;&lt;div&gt;&lt;span style=&quot;font-size: 10px;&quot;&gt;[sensor_msgs/PointCloud]&lt;/span&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="30" width="160" x="1378" y="325" as="geometry" />
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-38" edge="1" parent="1" style="endArrow=classic;html=1;rounded=0;fillColor=#0050ef;strokeColor=#001DBC;entryX=0;entryY=0.5;entryDx=0;entryDy=0;startArrow=oval;startFill=1;" target="2qpVZMzO5_dhKtPInlzN-22" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <Array as="points">
+              <mxPoint x="270" y="580" />
+              <mxPoint x="680" y="580" />
+              <mxPoint x="680" y="690" />
+            </Array>
+            <mxPoint x="270" y="440" as="sourcePoint" />
+            <mxPoint x="490" y="460" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-39" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontStyle=1" value="&lt;font style=&quot;font-size: 10px;&quot;&gt;/livox/lidar&lt;/font&gt;&lt;div&gt;&lt;font style=&quot;font-size: 10px;&quot;&gt;[10Hz][PointCloud2]&lt;/font&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="30" width="100" x="721" y="655" as="geometry" />
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-40" edge="1" parent="1" source="2qpVZMzO5_dhKtPInlzN-14" style="endArrow=classic;html=1;rounded=0;exitX=0.997;exitY=1.004;exitDx=0;exitDy=0;fillColor=#0050ef;strokeColor=#000000;exitPerimeter=0;entryX=0;entryY=-0.001;entryDx=0;entryDy=0;entryPerimeter=0;" target="2qpVZMzO5_dhKtPInlzN-27" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <Array as="points">
+              <mxPoint x="800" y="440" />
+            </Array>
+            <mxPoint x="760" y="450" as="sourcePoint" />
+            <mxPoint x="950" y="450" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-41" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontStyle=1" value="&lt;span style=&quot;font-size: 10px;&quot;&gt;/perception/livox/centroids&lt;/span&gt;&lt;div&gt;&lt;span style=&quot;font-size: 10px;&quot;&gt;[sensor_msgs/PointCloud]&lt;/span&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="30" width="160" x="1080" y="405" as="geometry" />
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-42" edge="1" parent="1" source="2qpVZMzO5_dhKtPInlzN-23" style="endArrow=classic;html=1;rounded=0;exitX=1.002;exitY=0.003;exitDx=0;exitDy=0;fillColor=#0050ef;strokeColor=#000000;exitPerimeter=0;entryX=0.504;entryY=0.987;entryDx=0;entryDy=0;entryPerimeter=0;" target="2qpVZMzO5_dhKtPInlzN-27" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <Array as="points">
+              <mxPoint x="1380" y="710" />
+            </Array>
+            <mxPoint x="860" y="490" as="sourcePoint" />
+            <mxPoint x="1632" y="490" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-43" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontStyle=1" value="&lt;span style=&quot;font-size: 10px;&quot;&gt;/perception/fusion/centroids&lt;/span&gt;&lt;div&gt;&lt;span style=&quot;font-size: 10px;&quot;&gt;[sensor_msgs/PointCloud]&lt;/span&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="30" width="160" x="1380" y="525" as="geometry" />
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-44" edge="1" parent="1" style="endArrow=classic;html=1;rounded=0;fillColor=#d80073;strokeColor=#A50040;startArrow=oval;startFill=1;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <Array as="points">
+              <mxPoint x="270" y="860" />
+              <mxPoint x="680" y="860" />
+              <mxPoint x="680" y="750" />
+            </Array>
+            <mxPoint x="270" y="720" as="sourcePoint" />
+            <mxPoint x="834" y="750" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-46" edge="1" parent="1" source="2qpVZMzO5_dhKtPInlzN-17" style="endArrow=classic;html=1;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;fillColor=#1ba1e2;strokeColor=#006EAF;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="2qpVZMzO5_dhKtPInlzN-21" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="380" y="731" as="sourcePoint" />
+            <mxPoint x="576" y="730" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-47" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontStyle=1" value="&lt;span style=&quot;font-size: 10px;&quot;&gt;/perception/camera/yolo_objects&lt;/span&gt;&lt;div&gt;&lt;span style=&quot;font-size: 10px;&quot;&gt;[detect_msgs/YoloObjectArray]&lt;/span&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="30" width="160" x="663" y="703" as="geometry" />
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-49" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontStyle=1" value="&lt;span style=&quot;font-size: 10px;&quot;&gt;/camera/image_raw/compressed&lt;/span&gt;&lt;div&gt;&lt;span style=&quot;font-size: 10px;&quot;&gt;[CompressedImage]&lt;/span&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="30" width="170" x="659" y="754" as="geometry" />
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-50" edge="1" parent="1" style="endArrow=classic;html=1;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;fillColor=#008a00;strokeColor=#005700;dashed=1;dashPattern=8 8;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <Array as="points">
+              <mxPoint x="640" y="120" />
+            </Array>
+            <mxPoint x="520" y="120" as="sourcePoint" />
+            <mxPoint x="640" y="-80" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-51" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontStyle=1" value="&lt;span style=&quot;font-size: 10px;&quot;&gt;/perception/velodyne/markers [MarkerArray]&lt;/span&gt;&lt;div&gt;&lt;span style=&quot;font-size: 10px;&quot;&gt;/perception/velodyne/bev_image [Image]&lt;/span&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="30" width="220" x="640" y="-60" as="geometry" />
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-52" edge="1" parent="1" source="2qpVZMzO5_dhKtPInlzN-14" style="endArrow=classic;html=1;rounded=0;exitX=0.998;exitY=0.001;exitDx=0;exitDy=0;fillColor=#008a00;strokeColor=#005700;dashed=1;dashPattern=8 8;exitPerimeter=0;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <Array as="points">
+              <mxPoint x="920" y="390" />
+            </Array>
+            <mxPoint x="910" y="520" as="sourcePoint" />
+            <mxPoint x="920" y="-80" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-53" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontStyle=1" value="&lt;span style=&quot;font-size: 10px;&quot;&gt;/perception/livox/preprocessed [PointCloud2]&lt;br&gt;&lt;/span&gt;" vertex="1">
+          <mxGeometry height="30" width="230" x="920" y="-60" as="geometry" />
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-54" edge="1" parent="1" source="2qpVZMzO5_dhKtPInlzN-22" style="endArrow=classic;html=1;rounded=0;exitX=0.996;exitY=-0.002;exitDx=0;exitDy=0;fillColor=#008a00;strokeColor=#005700;dashed=1;dashPattern=8 8;exitPerimeter=0;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <Array as="points">
+              <mxPoint x="1120" y="670" />
+            </Array>
+            <mxPoint x="1180" y="830" as="sourcePoint" />
+            <mxPoint x="1120" y="960" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="2qpVZMzO5_dhKtPInlzN-55" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontStyle=1" value="&lt;span style=&quot;font-size: 10px;&quot;&gt;/perception/fusion/filtered_cloud [PointCloud2]&lt;br&gt;&lt;/span&gt;" vertex="1">
+          <mxGeometry height="30" width="230" x="1126" y="920" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

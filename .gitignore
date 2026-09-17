@@ -1,12 +1,46 @@
-# 기본적으로 최상위 항목을 모두 무시
+# ===== 최상위: 명시한 항목만 추적 =====
 /*
-
-# 추적할 항목만 예외로 허용
 !/.gitignore
 !/README.md
+!/docs/
 !/perception_ws/
 !/system_ws/
+!/2026_pipeline.drawio
+!/2026_pipeline.png
+!/yolo-requirements.txt
+!/snapshot_host_rootfs.sh
+!/ver1.zip
 
-# 추적 대상 안에서도 파이썬 캐시는 무시
+# ===== catkin / ROS build artifacts =====
+build/
+devel/
+install/
+log/
+logs/
+.catkin_tools/
+.catkin_workspace
+*.bag
+*.bag.active
+
+# ===== Python =====
 __pycache__/
-*.pyc
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# ===== Editors / IDEs =====
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+
+# ===== AI agents / assistants =====
+.claude/
+.codex/
+.cursor/
+
+# ===== Misc =====
+*.log
+*.tmp
+*.bak
