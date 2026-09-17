@@ -18,7 +18,8 @@ Clothoid-R 자율주행 시스템의 Perception ROS workspace.
 
 ## Team
 
-<table>
+<div align="center">
+<table align="center">
 <tr>
 <td align="center" width="180">
   <a href="https://github.com/JaGyeong1024"><img src="https://avatars.githubusercontent.com/u/92356313?s=400&u=9df94c6f0e773e86773cb4fcc379f1204a7dcff7&v=4" width="100px;" alt=""/><br /><sub><b>구자경</b></sub></a><br />Perception Architecture
@@ -34,6 +35,7 @@ Clothoid-R 자율주행 시스템의 Perception ROS workspace.
 </td>
 </tr>
 </table>
+</div>
 
 ## Pipeline
 
