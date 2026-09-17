@@ -1,46 +1,34 @@
-# ===== 최상위: 명시한 항목만 추적 =====
+# Only the entries below are tracked; everything else at the root is local.
 /*
 !/.gitignore
 !/README.md
-!/tools/
-/tools/*
-!/tools/gen_pipeline_drawio.py
-!/perception_ws/
-!/system_ws/
 !/2026_pipeline.drawio
 !/2026_pipeline.png
 !/docker/
+!/perception_ws/
+!/system_ws/
+!/tools/
+/tools/*
+!/tools/gen_pipeline_drawio.py
 
-# ===== catkin / ROS build artifacts =====
+# catkin / ROS
 build/
 devel/
 install/
 log/
-logs/
 .catkin_tools/
 .catkin_workspace
 *.bag
 *.bag.active
 
-# ===== Python =====
+# Python
 __pycache__/
 *.py[cod]
 *.egg-info/
-.pytest_cache/
 
-# ===== Editors / IDEs =====
+# Editors / OS
 .vscode/
 .idea/
 *.swp
 *~
 .DS_Store
-
-# ===== AI agents / assistants =====
-.claude/
-.codex/
-.cursor/
-
-# ===== Misc =====
-*.log
-*.tmp
-*.bak
