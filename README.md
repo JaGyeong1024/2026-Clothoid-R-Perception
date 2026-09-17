@@ -1,20 +1,7 @@
 # 2026 Clothoid-R Perception
 
-Clothoid-R 자율주행 시스템의 Perception ROS workspace.
-
-카메라와 LiDAR 기반 객체 검출, 클러스터링, 추적, 센서 퓨전 패키지 구성.
-
-## Layout
-
-| 경로 | 내용 |
-|---|---|
-| `perception_ws/` | 인지 패키지 (아래 Packages) + `yolo26/` 커스텀 ultralytics |
-| `system_ws/` | 센서 드라이버: `camera_start`(웹캠), `livox_ros_driver`, `velodyne` |
-| `docs/CNU_SERVER.md` | 차량 PC(cnu) 하드웨어·소프트웨어 환경 |
-| `2026_pipeline.drawio/png` | 파이프라인 다이어그램 |
-
-구조 변경 이력: `d1572ef`까지는 `perception_ws` 내용물이 레포 루트(`src/`)였음. `66e7f32`부터 `perception_ws/` + `system_ws/`.
-`66e7f32` = 차량 PC 실주행본 기준선(2026-09-17 대조), 그 이후 커밋이 개선분.
+Clothoid-R 자율주행 시스템의 Perception ROS workspace.  
+카메라와 LiDAR 기반 객체 검출, 클러스터링, 추적, 센서 퓨전 패키지로 구성됩니다.
 
 ## Team
 
@@ -46,6 +33,15 @@ Clothoid-R 자율주행 시스템의 Perception ROS workspace.
 | Livox clustering | `/livox/lidar` | `/perception/livox/centroids` | `livox_clustering` |
 | Livox-camera fusion | `/livox/lidar`, `/camera/image_raw/compressed`, `/perception/camera/yolo` | `/perception/fusion/centroids` | `livox_camera_fusion` |
 | Velodyne BEV detection | `/velodyne_points` | `/perception/velodyne/centroids` | `velodyne_detection` |
+
+## Layout
+
+| Path | Contents |
+|---|---|
+| `perception_ws/` | 인지 패키지 (아래 Packages) + `yolo26/` 커스텀 ultralytics |
+| `system_ws/` | 센서 드라이버: `camera_start`(웹캠), `livox_ros_driver`, `velodyne` |
+| `docs/CNU_SERVER.md` | 차량 PC(cnu) 하드웨어·소프트웨어 환경 |
+| `2026_pipeline.drawio/png` | 파이프라인 다이어그램 |
 
 ## Packages
 
