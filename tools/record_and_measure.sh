@@ -74,7 +74,8 @@ MON_PID=""
 if [ "$DO_BAG" = 1 ]; then
   if [ "$RECORD_ALL" = 1 ]; then
     echo "녹화: 전체 토픽 (-a)"
-    ( cd "$OUT" && exec rosbag record -a -O record.bag ) > "$OUT/bag.log" 2>&1 &
+    setsid bash -c 'echo $$ > "$1/bag.pid"; cd "$1" && exec rosbag record -a -O record.bag' \
+      _ "$OUT" > "$OUT/bag.log" 2>&1 &
   else
     # 지금 존재하지 않는 토픽은 빼고 넘긴다 (없는 토픽을 주면 경고만 쌓인다)
     LIVE=$(timeout 5 rostopic list 2>/dev/null)
@@ -86,15 +87,23 @@ if [ "$DO_BAG" = 1 ]; then
       echo "녹화할 토픽이 하나도 없습니다." >&2; exit 1
     fi
     echo "녹화 토픽 ${#SEL[@]}개: ${SEL[*]}"
-    ( cd "$OUT" && exec rosbag record -O record.bag "${SEL[@]}" ) > "$OUT/bag.log" 2>&1 &
+    setsid bash -c 'D="$1"; shift; echo $$ > "$D/bag.pid"; cd "$D" && exec rosbag record -O record.bag "$@"' \
+      _ "$OUT" "${SEL[@]}" > "$OUT/bag.log" 2>&1 &
   fi
-  BAG_PID=$!
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    [ -s "$OUT/bag.pid" ] && break; sleep 0.3
+  done
+  BAG_PID=$(cat "$OUT/bag.pid" 2>/dev/null)
 fi
 
 if [ "$DO_MON" = 1 ]; then
   # 0 = Ctrl+C 까지 계속
-  python3 "$MON_PY" "$OUT/mon" 0 "$PERIOD" > "$OUT/monitor.log" 2>&1 &
-  MON_PID=$!
+  setsid bash -c 'echo $$ > "$1/mon.pid"; exec python3 "$2" "$1/mon" 0 "$3"' \
+    _ "$OUT" "$MON_PY" "$PERIOD" > "$OUT/monitor.log" 2>&1 &
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    [ -s "$OUT/mon.pid" ] && break; sleep 0.3
+  done
+  MON_PID=$(cat "$OUT/mon.pid" 2>/dev/null)
   echo "계측 시작 (주기 ${PERIOD}s)"
 fi
 
@@ -102,15 +111,25 @@ echo
 echo "기록 중...  종료하려면 Ctrl+C (녹화·계측 모두 저장하고 끝냅니다)"
 START=$(date +%s)
 
+SHUTTING_DOWN=0
+
 finish() {
+  SHUTTING_DOWN=1
   trap '' INT TERM
   echo
   echo "종료 중... (bag 마무리에 몇 초 걸릴 수 있습니다)"
   # rosbag 은 SIGINT 를 받아야 .bag.active 를 정상 .bag 으로 닫는다.
+  # SIGINT 는 각 자식에게 정확히 한 번만. 두 번 보내면 요약을 쓰다 끊긴다.
   [ -n "$BAG_PID" ] && kill -INT "$BAG_PID" 2>/dev/null
   [ -n "$MON_PID" ] && kill -INT "$MON_PID" 2>/dev/null
-  [ -n "$BAG_PID" ] && wait "$BAG_PID" 2>/dev/null
-  [ -n "$MON_PID" ] && wait "$MON_PID" 2>/dev/null
+  for _ in $(seq 1 60); do
+    local alive=0
+    [ -n "$BAG_PID" ] && kill -0 "$BAG_PID" 2>/dev/null && alive=1
+    [ -n "$MON_PID" ] && kill -0 "$MON_PID" 2>/dev/null && alive=1
+    [ "$alive" = 0 ] && break
+    sleep 0.5
+  done
+  rm -f "$OUT/bag.pid" "$OUT/mon.pid"
 
   # 혹시 .active 가 남으면 알려준다 (rosbag reindex 필요)
   if ls "$OUT"/*.bag.active >/dev/null 2>&1; then
@@ -139,6 +158,7 @@ trap finish INT TERM
 
 # 자식이 먼저 죽으면(예: 디스크 가득) 같이 정리한다
 while true; do
+  [ "$SHUTTING_DOWN" = 1 ] && break
   if [ -n "$BAG_PID" ] && ! kill -0 "$BAG_PID" 2>/dev/null; then
     echo "rosbag 이 예기치 않게 종료되었습니다. bag.log 를 확인하세요."; finish
   fi

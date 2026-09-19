@@ -4,7 +4,7 @@
 #   - 토픽별 처리율·드롭(seq 결번)·지연(stamp 기준)·바이트
 #   - rosbag record 자원 사용량을 따로 찍어 사후 역산 가능
 # 사용: python3 cr_monitor.py <출력디렉토리> [측정초] [샘플주기]
-import os, re, sys, time, struct, subprocess, threading, csv
+import os, re, sys, time, struct, subprocess, threading, csv, signal
 import rospy, psutil
 
 OUT = sys.argv[1] if len(sys.argv) > 1 else "/tmp/cr_run"
@@ -385,6 +385,18 @@ def main():
                 break
     except KeyboardInterrupt:
         pass
+
+    # 종료 처리 중 두 번째 SIGINT 로 요약 작성이 끊기지 않게 한다.
+    try:
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
+        signal.signal(signal.SIGTERM, signal.SIG_IGN)
+    except Exception:
+        pass
+    for f in (f_proc, f_sys, f_top, f_irq):
+        try:
+            f.flush(); f.close()
+        except Exception:
+            pass
 
     elapsed = time.time() - t0
     with open(os.path.join(OUT, "summary.txt"), "w") as f:
