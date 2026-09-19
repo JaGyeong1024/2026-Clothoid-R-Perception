@@ -416,15 +416,18 @@ def main():
         except Exception:
             pass
 
+    # 첫 표본은 구독이 연결되기 전이라 평균을 끌어내린다. 요약에서는 제외한다.
     elapsed = time.time() - t0
+    elapsed_eff = max(elapsed - PERIOD, 1e-6)
     with open(os.path.join(OUT, "summary.txt"), "w") as f:
         f.write("측정 시간: %.1f초\n\n" % elapsed)
         f.write("토픽별 누적\n")
         f.write("%-34s %10s %8s %8s %8s\n" % ("topic", "msgs", "avg_hz", "drops", "drop%"))
         for s in stats:
             dr = 100.0 * s.cum_drop / max(s.cum_n + s.cum_drop, 1)
+            # avg_hz 는 구독 연결 이후 구간 기준
             f.write("%-34s %10d %8.2f %8d %7.2f%s%s\n" % (
-                s.topic, s.cum_n, s.cum_n / elapsed, s.cum_drop, dr,
+                s.topic, s.cum_n, s.cum_n / elapsed_eff, s.cum_drop, dr,
                 "" if s.seq_ok else "  (seq 신뢰불가)",
                 ("  재동기화 %d회(발행노드 재시작 추정)" % s.cum_resync) if s.cum_resync else ""))
         f.write("\n주: bag_record 행의 cpu/rss/write 를 빼면 bag 제외 자원량이 된다.\n")

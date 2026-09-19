@@ -13,19 +13,33 @@ set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/.." && pwd)"
 
-# 녹화할 인지 관련 토픽. 필요하면 여기만 고친다.
+# 녹화할 토픽. 없는 토픽은 실행 시 자동으로 빠진다.
+# 인지 출력(/perception/*)은 원시 입력에서 재계산할 수 있어 제외한다.
+# 대신 계측기가 그 토픽들의 Hz·드롭·지연은 계속 기록한다(mon/topics.csv).
+# /camera/image_raw(무압축)는 초당 373MB 라 절대 넣지 않는다.
 TOPICS=(
-  /rosout
-  /rosout_agg
+  # 센서 원시 입력
   /camera/image_raw/compressed
   /livox/lidar
+  /livox/imu
   /velodyne_points
-  /perception/camera/yolo
-  /perception/livox/centroids
-  /perception/velodyne/centroids
-  /perception/fusion/centroids
+  /velodyne_packets
+  # 차량 상태 (인지 결과를 주행과 엮어 보려면 필요)
+  /MSG_CON/Rx_Vel
+  /MSG_CON/Rx_Vel_km
+  /MSG_CON/Rx_Steer
+  /MSG_CON/Rx_Gear
+  /MSG_CON/Rx_Break
+  /MSG_CON/Rx_Enc
+  /MSG_CON/Rx_Estop
+  /MSG_CON/Rx_AorM
+  /MSG_CON/Vehicle_Type
+  # 좌표계·진단·로그
   /tf
   /tf_static
+  /diagnostics
+  /rosout
+  /rosout_agg
 )
 
 RECORD_ALL=0
@@ -67,6 +81,29 @@ if [ "$DO_MON" = 1 ] && [ ! -f "$MON_PY" ]; then
 fi
 
 echo "출력 디렉토리: $OUT"
+
+# --- 메타데이터: bag 만으로는 복원할 수 없는 정보를 함께 남긴다 ---
+# (카메라 내부파라미터 같은 launch 파라미터, 어느 빌드로 돌았는지 등)
+META="$OUT/meta"
+mkdir -p "$META"
+{
+  echo "시각: $(date -Is)"
+  echo "호스트: $(hostname)  커널: $(uname -r)"
+} > "$META/run.txt" 2>&1
+rosparam dump "$META/rosparam.yaml"           >/dev/null 2>&1
+rosnode list                                   > "$META/nodes.txt" 2>&1
+rostopic list -v                               > "$META/topics.txt" 2>&1
+ps -eo pid=,cmd= | grep -E "ros|nodelet" | grep -v grep > "$META/processes.txt" 2>&1
+for r in "$REPO" "$HOME/clothoid-r"; do
+  [ -d "$r/.git" ] && {
+    echo "== $r"
+    git -C "$r" log -1 --format="%H %ad %s" --date=iso
+    git -C "$r" status --short
+  } >> "$META/git.txt" 2>&1
+done
+{ ip -br addr; echo; lsusb; echo; nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv; } \
+  > "$META/hardware.txt" 2>&1
+echo "메타데이터: $META (rosparam, 노드/토픽 목록, git HEAD, 하드웨어)"
 
 BAG_PID=""
 MON_PID=""
