@@ -1,7 +1,7 @@
 {
     "lidar_config": [
         {
-            "broadcast_code": "1PQDH5B00100041",
+            "broadcast_code": "1HDDH3200105241",
             "enable_connect": false,
             "return_mode": 0,
             "coordinate": 0,
