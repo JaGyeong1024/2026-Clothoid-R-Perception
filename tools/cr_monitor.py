@@ -283,20 +283,20 @@ def main():
 
     f_proc = open(os.path.join(OUT, "proc.csv"), "w", newline="")
     w_proc = csv.writer(f_proc)
-    w_proc.writerow(["ts", "label", "pids", "cpu_pct", "cpu_user_pct", "cpu_sys_pct",
+    w_proc.writerow(["epoch", "ts", "label", "pids", "cpu_pct", "cpu_user_pct", "cpu_sys_pct",
                      "rss_mb", "threads", "read_mbps", "write_mbps", "gpu_mem_mb"])
     f_sys = open(os.path.join(OUT, "system.csv"), "w", newline="")
     w_sys = csv.writer(f_sys)
-    w_sys.writerow(["ts", "cpu_mean_pct", "cpu_user_pct", "cpu_system_pct",
+    w_sys.writerow(["epoch", "ts", "cpu_mean_pct", "cpu_user_pct", "cpu_system_pct",
                     "cpu_iowait_pct", "cpu_irq_pct", "cpu_softirq_pct",
                     "mem_used_mb", "gpu_util_pct", "gpu_mem_mb"]
                    + ["rx_mbps_" + n for n in NICS] + ["tx_mbps_" + n for n in NICS])
     f_irq = open(os.path.join(OUT, "irq.csv"), "w", newline="")
     w_irq = csv.writer(f_irq)
-    w_irq.writerow(["ts", "device", "irqs_per_s"])
+    w_irq.writerow(["epoch", "ts", "device", "irqs_per_s"])
     f_top = open(os.path.join(OUT, "topics.csv"), "w", newline="")
     w_top = csv.writer(f_top)
-    w_top.writerow(["ts", "topic", "hz", "mbps", "drops", "cum_msgs", "cum_drops",
+    w_top.writerow(["epoch", "ts", "topic", "hz", "mbps", "drops", "cum_msgs", "cum_drops",
                     "lat_avg_ms", "lat_max_ms", "resync", "seq_valid"])
 
     io_prev = {}      # pid -> (read, write)
@@ -327,6 +327,7 @@ def main():
             if dt <= 0:
                 dt = PERIOD
             ts = round(now_t - t0, 2)
+            ep = round(now_t, 3)          # 절대 시각 (bag 타임스탬프와 대조용)
 
             cpu_tot = psutil.cpu_percent(None)
             vm = psutil.virtual_memory()
@@ -339,7 +340,7 @@ def main():
             dt_j = sum(stat_now[k] - stat_prev[k] for k in stat_now) or 1
             def jp(k):
                 return round(100.0 * (stat_now[k] - stat_prev[k]) / dt_j, 2)
-            w_sys.writerow([ts, round(cpu_tot, 1), jp("user"), jp("system"),
+            w_sys.writerow([ep, ts, round(cpu_tot, 1), jp("user"), jp("system"),
                             jp("iowait"), jp("irq"), jp("softirq"),
                             round(vm.used / 1e6, 1), gu, gm]
                            + [round((nic_now[(n, "rx")] - nic_prev[(n, "rx")]) * 8 / 1e6 / dt, 2) for n in NICS]
@@ -347,7 +348,7 @@ def main():
             for dev in sorted(set(irq_now) | set(irq_prev)):
                 d = irq_now.get(dev, 0) - irq_prev.get(dev, 0)
                 if d:
-                    w_irq.writerow([ts, dev, round(d / dt, 1)])
+                    w_irq.writerow([ep, ts, dev, round(d / dt, 1)])
             nic_prev = nic_now; stat_prev = stat_now; irq_prev = irq_now
 
             for lab, procs in sorted(scan_procs_cached().items()):
@@ -382,7 +383,7 @@ def main():
                         gmem += gpid.get(p.pid, 0.0)
                     except (psutil.NoSuchProcess, psutil.AccessDenied):
                         continue
-                w_proc.writerow([ts, lab, "|".join(str(x) for x in pids),
+                w_proc.writerow([ep, ts, lab, "|".join(str(x) for x in pids),
                                  round(cpu, 1), round(cu, 1), round(cs, 1),
                                  round(rss / 1e6, 1), thr,
                                  round(rd / 1e6 / dt, 2), round(wr / 1e6 / dt, 2),
@@ -390,7 +391,7 @@ def main():
 
             for s in stats:
                 n, b, d, lat, lmax, rs = s.take()
-                w_top.writerow([ts, s.topic, round(n / dt, 2),
+                w_top.writerow([ep, ts, s.topic, round(n / dt, 2),
                                 round(b * 8 / 1e6 / dt, 3), d, s.cum_n, s.cum_drop,
                                 ("%.1f" % (lat * 1000)) if lat == lat else "",
                                 ("%.1f" % (lmax * 1000)) if lmax else "",
@@ -420,7 +421,8 @@ def main():
     elapsed = time.time() - t0
     elapsed_eff = max(elapsed - PERIOD, 1e-6)
     with open(os.path.join(OUT, "summary.txt"), "w") as f:
-        f.write("측정 시간: %.1f초\n\n" % elapsed)
+        f.write("측정 시간: %.1f초 (시작 epoch %.3f = %s)\n\n"
+                % (elapsed, t0, time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(t0))))
         f.write("토픽별 누적\n")
         f.write("%-34s %10s %8s %8s %8s\n" % ("topic", "msgs", "avg_hz", "drops", "drop%"))
         for s in stats:

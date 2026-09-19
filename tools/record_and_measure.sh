@@ -105,6 +105,21 @@ done
   > "$META/hardware.txt" 2>&1
 echo "메타데이터: $META (rosparam, 노드/토픽 목록, git HEAD, 하드웨어)"
 
+# --- 사전 점검: 같은 토픽에 발행자가 둘 이상이면 수치가 부풀어 데이터를 못 쓴다 ---
+DUP=0
+for t in /camera/image_raw/compressed /livox/lidar /velodyne_points; do
+  np=$(timeout 5 rostopic info "$t" 2>/dev/null \
+       | awk '/^Publishers:/{f=1;next} /^Subscribers:/{f=0} f&&/^ \*/{c++} END{print c+0}')
+  if [ "${np:-0}" -gt 1 ]; then
+    echo "  경고: $t 에 발행자가 ${np}개 (중복 실행). 측정값이 부풀어집니다." >&2
+    DUP=1
+  fi
+done
+if [ "$DUP" = 1 ]; then
+  echo "  중복 launch 를 정리한 뒤 다시 실행하세요. 계속하려면 10초 안에 Ctrl+C 로 중단하지 마세요." >&2
+  sleep 10
+fi
+
 BAG_PID=""
 MON_PID=""
 
