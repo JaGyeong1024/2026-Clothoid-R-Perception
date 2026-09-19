@@ -264,6 +264,20 @@ def nic_bytes():
 
 def main():
     os.makedirs(OUT, exist_ok=True)
+
+    # 백그라운드 작업으로 기동되면 SIGINT 가 SIG_IGN 으로 상속되어
+    # 기본 KeyboardInterrupt 경로가 동작하지 않는다. 명시적으로 덮어쓴다.
+    stop = {"now": False}
+
+    def _on_signal(signum, _frame):
+        stop["now"] = True
+
+    for _s in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+        try:
+            signal.signal(_s, _on_signal)
+        except Exception:
+            pass
+
     rospy.init_node("cr_monitor", anonymous=True, disable_signals=True)
     stats = [TopicStat(t) for t in TOPICS]
 
@@ -301,8 +315,10 @@ def main():
     rospy.loginfo("[cr_monitor] 시작 -> %s (주기 %.1fs, %s)",
                   OUT, PERIOD, ("%.0f초" % DUR) if DUR else "Ctrl-C 까지")
     try:
-        while not rospy.is_shutdown():
+        while not rospy.is_shutdown() and not stop["now"]:
             time.sleep(PERIOD)
+            if stop["now"]:
+                break
             now_t = time.time()
             # 표본 간 "실제" 경과. nvidia-smi 호출 등으로 PERIOD 보다 길어지므로
             # 모든 비율(Hz, Mbps, MB/s, CPU%)은 이 값으로 나눈다.
@@ -382,6 +398,8 @@ def main():
 
             f_proc.flush(); f_sys.flush(); f_top.flush(); f_irq.flush()
             if DUR and (time.time() - t0) >= DUR:
+                break
+            if stop["now"]:
                 break
     except KeyboardInterrupt:
         pass

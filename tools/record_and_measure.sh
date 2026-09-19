@@ -122,11 +122,24 @@ finish() {
   # SIGINT 는 각 자식에게 정확히 한 번만. 두 번 보내면 요약을 쓰다 끊긴다.
   [ -n "$BAG_PID" ] && kill -INT "$BAG_PID" 2>/dev/null
   [ -n "$MON_PID" ] && kill -INT "$MON_PID" 2>/dev/null
-  for _ in $(seq 1 60); do
+  local waited=0
+  while [ "$waited" -lt 120 ]; do
     local alive=0
     [ -n "$BAG_PID" ] && kill -0 "$BAG_PID" 2>/dev/null && alive=1
     [ -n "$MON_PID" ] && kill -0 "$MON_PID" 2>/dev/null && alive=1
     [ "$alive" = 0 ] && break
+    # 20초가 지나도 안 죽으면 TERM, 40초면 KILL 로 단계적 강제 종료
+    if [ "$waited" = 40 ]; then
+      echo "  응답이 없어 SIGTERM 을 보냅니다"
+      [ -n "$BAG_PID" ] && kill -TERM "$BAG_PID" 2>/dev/null
+      [ -n "$MON_PID" ] && kill -TERM "$MON_PID" 2>/dev/null
+    fi
+    if [ "$waited" = 80 ]; then
+      echo "  강제 종료합니다 (bag 이 손상될 수 있습니다)"
+      [ -n "$BAG_PID" ] && kill -9 "$BAG_PID" 2>/dev/null
+      [ -n "$MON_PID" ] && kill -9 "$MON_PID" 2>/dev/null
+    fi
+    waited=$((waited + 1))
     sleep 0.5
   done
   rm -f "$OUT/bag.pid" "$OUT/mon.pid"
@@ -154,7 +167,7 @@ finish() {
   fi
   exit 0
 }
-trap finish INT TERM
+trap finish INT TERM HUP
 
 # 자식이 먼저 죽으면(예: 디스크 가득) 같이 정리한다
 while true; do
