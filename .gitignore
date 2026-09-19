@@ -10,6 +10,8 @@
 !/tools/
 /tools/*
 !/tools/gen_pipeline_drawio.py
+!/tools/record_and_measure.sh
+!/tools/cr_monitor.py
 
 # catkin / ROS
 build/
