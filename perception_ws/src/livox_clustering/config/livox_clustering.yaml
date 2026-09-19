@@ -2,8 +2,8 @@ pitch_deg: 0.73   # 마운트 pitch (bag RANSAC 측정)
 
 roi_x_min: 0.0
 roi_x_max: 8.0
-roi_y_min: -2.0   # 좌우 대칭. 주행 차선이 바뀌어도 양쪽을 본다
-roi_y_max: 2.0    # 〃 (차선 밖 검출은 플래닝이 거른다)
+roi_y_min: -3.0   # 좌우 대칭. 주행 차선이 바뀌어도 양쪽을 본다
+roi_y_max: 3.0    # 〃 (차선 밖 검출은 플래닝이 거른다)
 roi_z_min: -2.0
 roi_z_max: 1.5
 voxel_size: 0.1
