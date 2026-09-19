@@ -42,6 +42,12 @@ TRACKER_MAX_MISS = 5
 MATCH_DIST       = 1.5
 TRACKER_MIN_HITS = 3   # 이 프레임 수 이상 연속 관측된 트랙만 발행
 
+# 라바콘처럼 작고 높은 물체용 추가 규칙. 큰 물체(ERP·사람) 규칙과 OR 로 묶는다.
+# 지면·풀·박스는 넓고 납작해(종횡비 중앙 0.32) 종횡비로 갈린다 (콘은 2.9~3.0).
+CONE_MAX_FOOTPRINT = 0.5   # 수평 최대 변이 이보다 작아야 콘 후보
+CONE_MIN_HEIGHT    = 0.25
+CONE_MIN_ASPECT    = 1.5   # 높이 / 수평 최대 변
+
 def load_algorithm_params():
     global PITCH_DEG, ROI_X_MIN, ROI_X_MAX, ROI_Y_MIN, ROI_Y_MAX, ROI_Z_MIN, ROI_Z_MAX
     global VOXEL_SIZE, DROR_MIN_NEIGHBORS, DROR_MIN_RADIUS, DROR_RADIUS_SCALE, DROR_MAX_RADIUS
@@ -49,6 +55,7 @@ def load_algorithm_params():
     global EUCLIDEAN_MIN_CLUSTER_SIZE, CLUSTER_MERGE_GAP
     global MAX_LENGTH, MAX_WIDTH, MAX_HEIGHT, MIN_LENGTH, MIN_WIDTH, MIN_HEIGHT
     global EUCLIDEAN_BASE_DIST, EUCLIDEAN_DIST_SCALE, TRACKER_MAX_MISS, MATCH_DIST, TRACKER_MIN_HITS
+    global CONE_MAX_FOOTPRINT, CONE_MIN_HEIGHT, CONE_MIN_ASPECT
 
     PITCH_DEG = rospy.get_param("~pitch_deg", PITCH_DEG)
     ROI_X_MIN = rospy.get_param("~roi_x_min", ROI_X_MIN)
@@ -83,6 +90,10 @@ def load_algorithm_params():
     TRACKER_MAX_MISS = int(rospy.get_param("~tracker_max_miss", TRACKER_MAX_MISS))
     MATCH_DIST = rospy.get_param("~match_dist", MATCH_DIST)
     TRACKER_MIN_HITS = int(rospy.get_param("~tracker_min_hits", TRACKER_MIN_HITS))
+
+    CONE_MAX_FOOTPRINT = rospy.get_param("~cone_max_footprint", CONE_MAX_FOOTPRINT)
+    CONE_MIN_HEIGHT = rospy.get_param("~cone_min_height", CONE_MIN_HEIGHT)
+    CONE_MIN_ASPECT = rospy.get_param("~cone_min_aspect", CONE_MIN_ASPECT)
 
 # ---------- 보조 클래스 ----------
 class KalmanFilter:
@@ -232,9 +243,16 @@ def merge_clusters(pts, lbl):
 def bbox_ok(pts):
     if len(pts)==0: return False
     xl,yl,zl = np.ptp(pts[:,0]), np.ptp(pts[:,1]), np.ptp(pts[:,2])
-    return (MIN_LENGTH<xl<MAX_LENGTH and
+    # 큰 물체 (ERP·사람·드럼)
+    if (MIN_LENGTH<xl<MAX_LENGTH and
             MIN_WIDTH <yl<MAX_WIDTH  and
-            MIN_HEIGHT<zl<MAX_HEIGHT)
+            MIN_HEIGHT<zl<MAX_HEIGHT):
+        return True
+    # 작고 높은 물체 (라바콘). 하한을 낮추는 대신 종횡비로 지면·풀·박스를 배제한다.
+    foot = max(xl, yl)
+    return (foot < CONE_MAX_FOOTPRINT and
+            zl > CONE_MIN_HEIGHT and
+            zl / max(foot, 1e-6) > CONE_MIN_ASPECT)
 
 class LivoxEuclideanClustering:
     def __init__(self):
