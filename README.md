@@ -115,7 +115,9 @@ cd 2026-Clothoid-R-Perception
 
 The container persists. Running the script from several terminals attaches to the **same container**, so you can start each node in its own terminal exactly as on the vehicle.
 
-The repo is mounted at `/home/cnu/clothoid-r-perception` inside the container. **Edit on the host, build and run in the container.** Update code with `git pull` on the host.
+The repo is mounted at `/home/cnu/clothoid-r-perception` inside the container. **Edit on the host, build and run in the container.** Update code with `git pull` on the host. The home directory is always `/home/cnu` whatever your host account is, so the paths match the vehicle exactly (this is what makes the `yolo_detect.py` shebang resolve).
+
+Entering through the script sources `/opt/ros/noetic/setup.bash` and, once built, `system_ws/devel/setup.bash` and `perception_ws/devel/setup.bash` for you — no manual sourcing on entry. That happens in `docker/env.sh`, which lives in the repo rather than in the image, so it updates with `git pull` and never needs a rebuild. If you attach with a bare `docker exec` instead, source it yourself: `. docker/env.sh`.
 
 | Command | Action |
 |---|---|
@@ -132,10 +134,19 @@ Layout:
 | `docker/Dockerfile.dev` | base + the python stack. Built locally by each developer |
 | `docker/requirements-system.txt` | System python3.8 pins (livox_clustering, velodyne_detection) |
 | `docker/requirements-yolo.txt` | conda `yolo` env python3.10 pins (yolo26) |
+| `docker/env.sh` | Shell environment sourced on entry (ROS + built workspaces) |
 
 The pins were taken from `pip freeze` on the cnu PC used for the competition run (2026-09-17). To change a dependency, edit the requirements file — the base image does not need to be rebuilt.
 
 Sensors are not available inside the container, so develop against rosbags. Note that the pipeline is verified by building all 15 packages in the container; sensor-dependent behaviour still has to be checked on the vehicle.
+
+The `cnu` user inside the image is baked at UID/GID 1000, which matches a single-user Ubuntu desktop. If `id -u` on your host is not 1000, files the container writes into the bind-mounted repo end up owned by the wrong host user. Rebuild the base image locally with your own ids instead of pulling it:
+
+```bash
+docker build --build-arg USER_UID=$(id -u) --build-arg USER_GID=$(id -g) \
+  -f docker/Dockerfile.base -t clothoid-r-perception:base docker/
+BASE_IMAGE=clothoid-r-perception:base ./docker/clothoid.sh build
+```
 
 ## Native Setup
 

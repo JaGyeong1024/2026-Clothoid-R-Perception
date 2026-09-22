@@ -15,6 +15,9 @@ IMAGE=clothoid-r-perception:dev
 BASE_IMAGE=${BASE_IMAGE:-ghcr.io/jagyeong1024/clothoid-r-perception:base}
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CONTAINER_DIR=/home/cnu/clothoid-r-perception
+# 셸마다 ROS·워크스페이스를 소싱해 주는 파일. 레포 안에 있어서 이미지 재빌드 없이
+# git pull 로 갱신된다 (docker/env.sh).
+CONTAINER_ENV=${CONTAINER_DIR}/docker/env.sh
 # bag 은 레포 밖에 두므로 따로 마운트한다. 다른 곳에 뒀으면 BAGS_DIR 로 덮어쓴다.
 # 컨테이너 사용자는 호스트 계정과 무관하게 항상 cnu 라, 안에서는 늘 ~/Clothoid-R-Bags 로 보인다.
 BAGS_DIR="${BAGS_DIR:-$HOME/Clothoid-R-Bags}"
@@ -22,8 +25,15 @@ CONTAINER_BAGS_DIR=/home/cnu/Clothoid-R-Bags
 
 case "$1" in
   build)
-    echo "[1/2] base 이미지 받는 중: ${BASE_IMAGE}"
-    docker pull "${BASE_IMAGE}" || exit 1
+    # 이미 있으면 받지 않는다. BASE_IMAGE 를 직접 빌드한 로컬 태그로 덮어쓴 경우
+    # (UID 가 1000 이 아니라 base 를 직접 빌드한 팀원) docker pull 이 레지스트리에서
+    # 못 찾고 실패하기 때문이다. 레지스트리 base 를 갱신하려면 docker pull 을 직접 할 것.
+    if docker image inspect "${BASE_IMAGE}" >/dev/null 2>&1; then
+      echo "[1/2] base 이미지가 이미 있다: ${BASE_IMAGE}"
+    else
+      echo "[1/2] base 이미지 받는 중: ${BASE_IMAGE}"
+      docker pull "${BASE_IMAGE}" || exit 1
+    fi
     echo "[2/2] 파이썬 의존성 설치해서 dev 이미지 만드는 중 (10~20분, 처음 한 번만)"
     docker build --build-arg BASE="${BASE_IMAGE}" \
       -f "${REPO_DIR}/docker/Dockerfile.dev" -t "${IMAGE}" "${REPO_DIR}/docker" || exit 1
@@ -85,4 +95,11 @@ elif [ ! "$(docker ps -q -f name=^/${CONTAINER_NAME}$)" ]; then
     docker start "${CONTAINER_NAME}" >/dev/null || exit 1
 fi
 
-exec docker exec ${TTY_FLAGS} "${CONTAINER_NAME}" bash ${1:+-lc "$*"}
+# 명령을 주면 소싱 후 실행하고, 안 주면 소싱한 환경 그대로 대화형 셸을 띄운다.
+# 대화형 쪽을 `exec bash` 로 갈아타게 두는 이유: 소싱이 내보낸 환경변수는 그대로
+# 물려받으면서 ~/.bashrc(프롬프트·색·alias)도 평소대로 읽히게 하려는 것이다.
+if [ -n "$1" ]; then
+    exec docker exec ${TTY_FLAGS} "${CONTAINER_NAME}" bash -lc ". ${CONTAINER_ENV}; $*"
+else
+    exec docker exec ${TTY_FLAGS} "${CONTAINER_NAME}" bash -lc ". ${CONTAINER_ENV}; exec bash"
+fi
