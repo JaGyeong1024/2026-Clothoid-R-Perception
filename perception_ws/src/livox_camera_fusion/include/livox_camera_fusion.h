@@ -32,16 +32,16 @@
 /* ===== Parameters ===== */
 static constexpr double BBOX_SCALE_RATIO = 1.0;
 static constexpr double CLUSTER_TOLERANCE = 0.4;
-static constexpr int CLUSTER_MIN_SIZE = 3;
-static constexpr int CLUSTER_MAX_SIZE = 100;
-static constexpr double ROI_RADIUS_PX = 10.0;
+static constexpr int CLUSTER_MIN_SIZE = 10;    // bbox 전체를 쓰므로 노이즈 컷 겸
+static constexpr int CLUSTER_MAX_SIZE = 5000;  // 근거리 콘 bbox 한 개에 ~900점 들어옴
 static constexpr double MATCH_DIST = 0.7;  // 20km/h, 10Hz 기준 프레임당 ego 이동 ~0.56m + 여유
 static constexpr int TRACKER_MAX_MISS = 10;
 static constexpr int MIN_BBOX_EDGE_PX = 0;
 
-/* ===== Livox 마운트 pitch (bag RANSAC 측정) ===== */
-/* projection 은 raw 좌표(extrinsic 이 기울임 흡수), ROI·cluster bbox 는 pitch 보정한 leveled 좌표 기준 */
-static constexpr double LIDAR_PITCH_DEG = 0.73;
+/* ===== Livox 마운트 pitch ===== */
+/* projection 은 raw 좌표(extrinsic 이 기울임 흡수), ROI·cluster bbox 는 pitch 보정한 leveled 좌표 기준.
+ * 주행 bag 지면 평면 fit 중앙값 -0.11°, 프레임 편차 ±0.5° (차체 피칭) → 정적 오프셋은 잡음 이하라 보정 안 함. */
+static constexpr double LIDAR_PITCH_DEG = 0.0;
 
 /* ===== LiDAR 3D ROI (leveled 좌표) ===== */
 static constexpr double LIDAR_ROI_X_MIN =  0.0;
@@ -60,13 +60,15 @@ static constexpr int    GRID_MIN_POINTS       = 10;
 static constexpr double GROUND_RANSAC_THRESH  = 0.2;  // livox_clustering(0.3)보다 보수적
 
 /* ===== 3D bbox gate (cluster AABB: x=length, y=width, z=height) ===== */
-/* MIN 은 노이즈 컷, MAX 는 사실상 미사용 */
-static constexpr double CLUSTER_MIN_LENGTH = 0.1;
-static constexpr double CLUSTER_MAX_LENGTH = 10.0;
-static constexpr double CLUSTER_MIN_WIDTH  = 0.1;
-static constexpr double CLUSTER_MAX_WIDTH  = 10.0;
-static constexpr double CLUSTER_MIN_HEIGHT = 0.1;
-static constexpr double CLUSTER_MAX_HEIGHT = 10.0;
+/* bbox 안 클러스터 중 이 게이트를 통과한 것들 가운데 최근접을 채택.
+ * 콘(실측 W 0.05~0.4, H 0.2~0.55)과 ERP(~1.5x2x1.6) 를 모두 통과시키고,
+ * 뒤 배경(벽·수풀, 한 변 3m 초과)과 앞 얇은 조각(H < 0.1) 을 떨어뜨리는 범위 */
+static constexpr double CLUSTER_MIN_LENGTH = 0.05;
+static constexpr double CLUSTER_MAX_LENGTH = 3.0;
+static constexpr double CLUSTER_MIN_WIDTH  = 0.05;
+static constexpr double CLUSTER_MAX_WIDTH  = 3.0;
+static constexpr double CLUSTER_MIN_HEIGHT = 0.2;
+static constexpr double CLUSTER_MAX_HEIGHT = 2.0;
 
 /* ===== Kalman Tracker ===== */
 struct KalmanTracker
@@ -104,6 +106,7 @@ private:
     ros::NodeHandle nh;
     ros::Publisher centroid_pub;       // /perception/fusion/centroids
     ros::Publisher filtered_cloud_pub; // /perception/fusion/filtered_cloud
+    ros::Publisher preprocessed_pub;   // /perception/fusion/preprocessed_points (ROI+지면 제거 후, 클러스터링 전)
 
     std::shared_ptr<message_filters::Subscriber<sensor_msgs::PointCloud2>>     sub_lidar;
     std::shared_ptr<message_filters::Subscriber<sensor_msgs::CompressedImage>> sub_camera;
@@ -111,7 +114,7 @@ private:
     std::shared_ptr<message_filters::Synchronizer<SyncPolicy>>                 sync;
 
     std::string lidar_topic, camera_topic, yolo_topic;
-    std::string centroid_topic, filtered_cloud_topic, frame_name;
+    std::string centroid_topic, filtered_cloud_topic, preprocessed_topic, frame_name;
 
     cv::Mat projection_matrix;
     cv::Mat camera_image;
@@ -129,15 +132,12 @@ private:
     void collect_points_in_bbox(const ImageBox &box,
                                 std::vector<cv::Point2d> &matched_px,
                                 pcl::PointCloud<pcl::PointXYZ>::Ptr local) const;
-    pcl::PointCloud<pcl::PointXYZ>::Ptr extract_roi(
-        const std::vector<cv::Point2d> &matched_px,
-        const pcl::PointCloud<pcl::PointXYZ>::Ptr &local,
-        const cv::Point2d &center) const;
     void remove_ground_full(std::vector<cv::Point3d> &pts,
                             std::vector<cv::Point2d> &proj);
-    bool largest_cluster_centroid(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud,
-                                  cv::Point2d &centroid,
-                                  cv::Vec3d &extent) const;
+    void publish_preprocessed(const std_msgs::Header &header);
+    bool select_cluster_centroid(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud,
+                                 cv::Point2d &centroid,
+                                 cv::Vec3d &extent) const;
     void draw_bbox_debug(const ImageBox &box);
     void publish_2D_pointcloud(const std::vector<cv::Point2d> &pts,
                                const std_msgs::Header &header);

@@ -4,6 +4,7 @@
   <arg name="yolo_topic"   default="/perception/camera/yolo"/>
   <arg name="centroid_topic" default="/perception/fusion/centroids"/>
   <arg name="filtered_cloud_topic" default="/perception/fusion/filtered_cloud"/>
+  <arg name="preprocessed_topic" default="/perception/fusion/preprocessed_points"/>
   <arg name="frame_name"   default="livox_frame"/>
   <arg name="projection_config" default="$(find livox_camera_fusion)/config/projection.yaml"/>
 
@@ -17,6 +18,7 @@
     <param name="yolo_topic"   value="$(arg yolo_topic)"/>
     <param name="centroid_topic" value="$(arg centroid_topic)"/>
     <param name="filtered_cloud_topic" value="$(arg filtered_cloud_topic)"/>
+    <param name="preprocessed_topic" value="$(arg preprocessed_topic)"/>
     <param name="frame_name"   value="$(arg frame_name)"/>
   </node>
 </launch>

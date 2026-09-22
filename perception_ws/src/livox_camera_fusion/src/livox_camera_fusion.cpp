@@ -67,10 +67,12 @@ LivoxCameraFusion::LivoxCameraFusion(ros::NodeHandle *nodeHandle)
     nh.param("yolo_topic",           yolo_topic,           std::string("/perception/camera/yolo"));
     nh.param("centroid_topic",       centroid_topic,       std::string("/perception/fusion/centroids"));
     nh.param("filtered_cloud_topic", filtered_cloud_topic, std::string("/perception/fusion/filtered_cloud"));
+    nh.param("preprocessed_topic",   preprocessed_topic,   std::string("/perception/fusion/preprocessed_points"));
     nh.param("frame_name",           frame_name,           std::string("livox_frame"));
 
     centroid_pub       = nh.advertise<sensor_msgs::PointCloud>(centroid_topic, 1);
     filtered_cloud_pub = nh.advertise<sensor_msgs::PointCloud2>(filtered_cloud_topic, 1);
+    preprocessed_pub   = nh.advertise<sensor_msgs::PointCloud2>(preprocessed_topic, 1);
 
     sub_lidar  = std::make_shared<message_filters::Subscriber<sensor_msgs::PointCloud2>>(nh, lidar_topic, 10);
     sub_camera = std::make_shared<message_filters::Subscriber<sensor_msgs::CompressedImage>>(nh, camera_topic, 10);
@@ -139,11 +141,11 @@ void LivoxCameraFusion::detectionCallback(
 
     // 지면 제거 (grid + RANSAC)
     if (ENABLE_GROUND_REMOVAL)
-    {
         remove_ground_full(lidar_points, projected_list);
-        if (lidar_points.empty())
-            return;
-    }
+
+    publish_preprocessed(lidar_msg->header);
+    if (lidar_points.empty())
+        return;
 
     convert_msg(yolo_msg, lidar_msg->header);
 }
@@ -166,26 +168,19 @@ void LivoxCameraFusion::convert_msg(
         std::vector<cv::Point2d> matched_px;
         pcl::PointCloud<pcl::PointXYZ>::Ptr local(new pcl::PointCloud<pcl::PointXYZ>);
         collect_points_in_bbox(box, matched_px, local);
-        if (matched_px.size() < static_cast<size_t>(CLUSTER_MIN_SIZE))
+        if (local->points.size() < static_cast<size_t>(CLUSTER_MIN_SIZE))
             continue;
-
-        pcl::PointCloud<pcl::PointXYZ>::Ptr roi = extract_roi(matched_px, local, box.center);
-        if (roi->points.size() < static_cast<size_t>(CLUSTER_MIN_SIZE))
-            continue;
+        local->width  = local->points.size();
+        local->height = 1;
 
         cv::Point2d centroid;
         cv::Vec3d ext;
-        if (!largest_cluster_centroid(roi, centroid, ext))
+        if (!select_cluster_centroid(local, centroid, ext))
             continue;
-        // 3D AABB gate (length=x, width=y, height=z)
-        const double length = ext[0], width = ext[1], height = ext[2];
-        if (length < CLUSTER_MIN_LENGTH || length > CLUSTER_MAX_LENGTH) continue;
-        if (width  < CLUSTER_MIN_WIDTH  || width  > CLUSTER_MAX_WIDTH)  continue;
-        if (height < CLUSTER_MIN_HEIGHT || height > CLUSTER_MAX_HEIGHT) continue;
         cur_centroids.push_back(centroid);
 
         draw_bbox_debug(box);
-        *out_cloud += *roi;
+        *out_cloud += *local;
     }
 
     prev_centroids = cur_centroids;
@@ -237,18 +232,6 @@ void LivoxCameraFusion::collect_points_in_bbox(
                                        lidar_points[i].z);
         }
     }
-}
-
-pcl::PointCloud<pcl::PointXYZ>::Ptr LivoxCameraFusion::extract_roi(
-    const std::vector<cv::Point2d> &matched_px,
-    const pcl::PointCloud<pcl::PointXYZ>::Ptr &local,
-    const cv::Point2d &center) const
-{
-    pcl::PointCloud<pcl::PointXYZ>::Ptr roi(new pcl::PointCloud<pcl::PointXYZ>);
-    for (size_t i = 0; i < matched_px.size(); ++i)
-        if (cv::norm(matched_px[i] - center) <= ROI_RADIUS_PX)
-            roi->points.push_back(local->points[i]);
-    return roi;
 }
 
 // 전체 클라우드 지면 제거: grid(셀별 min-z) → RANSAC 평면. pts/proj 는 같은 mask 로 필터링.
@@ -311,7 +294,27 @@ void LivoxCameraFusion::remove_ground_full(std::vector<cv::Point3d> &pts,
     proj = std::move(out_proj);
 }
 
-bool LivoxCameraFusion::largest_cluster_centroid(
+// ROI + 지면 제거를 거친 점군 (클러스터링 입력) — rviz 확인용
+void LivoxCameraFusion::publish_preprocessed(const std_msgs::Header &header)
+{
+    if (preprocessed_pub.getNumSubscribers() == 0)
+        return;
+    pcl::PointCloud<pcl::PointXYZ> cloud;
+    cloud.points.reserve(lidar_points.size());
+    for (const auto &p : lidar_points)
+        cloud.points.emplace_back(p.x, p.y, p.z);
+    cloud.width  = cloud.points.size();
+    cloud.height = 1;
+    sensor_msgs::PointCloud2 msg;
+    pcl::toROSMsg(cloud, msg);
+    msg.header = header;
+    msg.header.frame_id = frame_name;
+    preprocessed_pub.publish(msg);
+}
+
+// bbox 안 점을 클러스터링 → AABB 게이트 통과분 중 최근접(x 평균 최소) 채택.
+// 점 수 최대를 고르면 콘 뒤 벽·수풀이 잡히고, 단순 최근접은 앞의 얇은 조각이 잡힌다.
+bool LivoxCameraFusion::select_cluster_centroid(
     const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud,
     cv::Point2d &centroid,
     cv::Vec3d &extent) const
@@ -325,34 +328,40 @@ bool LivoxCameraFusion::largest_cluster_centroid(
     ec.setSearchMethod(tree);
     ec.setInputCloud(cloud);
     ec.extract(clusters);
-    if (clusters.empty())
-        return false;
 
-    const auto &largest = *std::max_element(
-        clusters.begin(), clusters.end(),
-        [](const pcl::PointIndices &a, const pcl::PointIndices &b)
-        {
-            return a.indices.size() < b.indices.size();
-        });
-    double sx = 0, sy = 0;
-    double xmin =  std::numeric_limits<double>::infinity();
-    double ymin =  std::numeric_limits<double>::infinity();
-    double zmin =  std::numeric_limits<double>::infinity();
-    double xmax = -std::numeric_limits<double>::infinity();
-    double ymax = -std::numeric_limits<double>::infinity();
-    double zmax = -std::numeric_limits<double>::infinity();
-    for (int idx : largest.indices)
+    bool found = false;
+    double best_x = std::numeric_limits<double>::infinity();
+    for (const auto &cl : clusters)
     {
-        const auto &p = cloud->points[idx];
-        sx += p.x; sy += p.y;
-        xmin = std::min(xmin, (double)p.x); xmax = std::max(xmax, (double)p.x);
-        ymin = std::min(ymin, (double)p.y); ymax = std::max(ymax, (double)p.y);
-        zmin = std::min(zmin, (double)p.z); zmax = std::max(zmax, (double)p.z);
+        double sx = 0, sy = 0;
+        double xmin =  std::numeric_limits<double>::infinity();
+        double ymin =  std::numeric_limits<double>::infinity();
+        double zmin =  std::numeric_limits<double>::infinity();
+        double xmax = -std::numeric_limits<double>::infinity();
+        double ymax = -std::numeric_limits<double>::infinity();
+        double zmax = -std::numeric_limits<double>::infinity();
+        for (int idx : cl.indices)
+        {
+            const auto &p = cloud->points[idx];
+            sx += p.x; sy += p.y;
+            xmin = std::min(xmin, (double)p.x); xmax = std::max(xmax, (double)p.x);
+            ymin = std::min(ymin, (double)p.y); ymax = std::max(ymax, (double)p.y);
+            zmin = std::min(zmin, (double)p.z); zmax = std::max(zmax, (double)p.z);
+        }
+        // 3D AABB gate (length=x, width=y, height=z)
+        const double length = xmax - xmin, width = ymax - ymin, height = zmax - zmin;
+        if (length < CLUSTER_MIN_LENGTH || length > CLUSTER_MAX_LENGTH) continue;
+        if (width  < CLUSTER_MIN_WIDTH  || width  > CLUSTER_MAX_WIDTH)  continue;
+        if (height < CLUSTER_MIN_HEIGHT || height > CLUSTER_MAX_HEIGHT) continue;
+
+        const double mx = sx / cl.indices.size();
+        if (mx >= best_x) continue;
+        best_x   = mx;
+        centroid = cv::Point2d(mx, sy / cl.indices.size());
+        extent   = cv::Vec3d(length, width, height);
+        found    = true;
     }
-    centroid = cv::Point2d(sx / largest.indices.size(),
-                           sy / largest.indices.size());
-    extent = cv::Vec3d(xmax - xmin, ymax - ymin, zmax - zmin);
-    return true;
+    return found;
 }
 
 void LivoxCameraFusion::draw_bbox_debug(const ImageBox &box)
