@@ -15,6 +15,10 @@ IMAGE=clothoid-r-perception:dev
 BASE_IMAGE=${BASE_IMAGE:-ghcr.io/jagyeong1024/clothoid-r-perception:base}
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CONTAINER_DIR=/home/cnu/clothoid-r-perception
+# bag 은 레포 밖에 두므로 따로 마운트한다. 다른 곳에 뒀으면 BAGS_DIR 로 덮어쓴다.
+# 컨테이너 사용자는 호스트 계정과 무관하게 항상 cnu 라, 안에서는 늘 ~/Clothoid-R-Bags 로 보인다.
+BAGS_DIR="${BAGS_DIR:-$HOME/Clothoid-R-Bags}"
+CONTAINER_BAGS_DIR=/home/cnu/Clothoid-R-Bags
 
 case "$1" in
   build)
@@ -57,12 +61,16 @@ if [ ! "$(docker ps -aq -f name=^/${CONTAINER_NAME}$)" ]; then
     # X11 GUI (rviz, cv2.imshow)
     xhost +local:docker >/dev/null 2>&1
 
+    # 없으면 docker 가 root 소유로 만들어 버리니 먼저 호스트 계정으로 만든다.
+    mkdir -p "${BAGS_DIR}"
+
     docker run -d ${GPU_ARGS} --privileged \
       -e DISPLAY="$DISPLAY" \
       -e QT_X11_NO_MITSHM=1 \
       -v /tmp/.X11-unix:/tmp/.X11-unix \
       -v /dev:/dev:rw \
       -v "${REPO_DIR}:${CONTAINER_DIR}" \
+      -v "${BAGS_DIR}:${CONTAINER_BAGS_DIR}" \
       --hostname "$(hostname)" \
       --network=host \
       --ipc=host \
