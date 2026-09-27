@@ -63,7 +63,7 @@ def parse_args() -> argparse.Namespace:
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     # 경로는 repo 루트 기준 상대경로. main() 에서 os.chdir(REPO_ROOT) 한다.
-    p.add_argument("--weights", default="model/best.pt",
+    p.add_argument("--weights", default="src/yolo26/models/best.pt",
                    help="입력 가중치 (.pt) — repo 루트 기준")
     p.add_argument("--onnx", default=None,
                    help="ONNX 출력 경로 (기본: weights 와 같은 이름의 .onnx)")

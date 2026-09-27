@@ -11,7 +11,7 @@ from detect_msgs.msg import Objects, Yolo_Objects
 from sensor_msgs.msg import CompressedImage
 from std_msgs.msg import Header
 
-sys.path.insert(0, "/home/a/Clothoid-R/perception_ws/yolo26")
+sys.path.insert(0, "/home/a/2026-Clothoid-R-Perception/perception_ws/yolo26")
 from ultralytics import YOLO
 
 logging.getLogger("ultralytics").setLevel(logging.ERROR)
