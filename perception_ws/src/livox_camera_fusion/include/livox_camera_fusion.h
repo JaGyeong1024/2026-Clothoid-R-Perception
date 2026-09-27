@@ -12,6 +12,7 @@
 #include <pcl_ros/point_cloud.h>
 #include <pcl/segmentation/extract_clusters.h>
 #include <pcl/search/kdtree.h>
+#include <pcl/filters/voxel_grid.h>
 #include <pcl_conversions/pcl_conversions.h>
 
 #include <std_msgs/Header.h>
@@ -33,7 +34,10 @@
 static constexpr double BBOX_SCALE_RATIO = 1.0;
 static constexpr double CLUSTER_TOLERANCE = 0.4;
 static constexpr int CLUSTER_MIN_SIZE = 10;    // bbox 전체를 쓰므로 노이즈 컷 겸
-static constexpr int CLUSTER_MAX_SIZE = 5000;  // 근거리 콘 bbox 한 개에 ~900점 들어옴
+/* 클러스터 점 수 상한은 두지 않는다 (가까운 물체일수록 점이 많아 상한은 "가까운 물체 버림"이 된다).
+ * 대신 bbox 점이 많으면 복셀로 솎아 클러스터링 연산을 묶는다. 쓰레기 클러스터는 아래 크기 게이트가 거른다. */
+static constexpr int    BBOX_VOXEL_MIN_POINTS = 1000;
+static constexpr double BBOX_VOXEL_LEAF       = 0.05;
 static constexpr double MATCH_DIST = 0.7;  // 20km/h, 10Hz 기준 프레임당 ego 이동 ~0.56m + 여유
 static constexpr int TRACKER_MAX_MISS = 10;
 static constexpr int MIN_BBOX_EDGE_PX = 0;
@@ -51,13 +55,8 @@ static constexpr double LIDAR_ROI_Y_MAX =  7.0;
 static constexpr double LIDAR_ROI_Z_MIN = -2.0;
 static constexpr double LIDAR_ROI_Z_MAX =  2.0;
 
-/* ===== 지면 제거 (bbox 매칭 전 전체 클라우드에 grid + RANSAC) ===== */
-/* per-bbox RANSAC 은 점이 적어 물체 하부를 지면으로 오인하므로 전체 클라우드 방식 사용 */
-static constexpr bool   ENABLE_GROUND_REMOVAL = true;
-static constexpr double GRID_CELL_SIZE        = 0.2;
-static constexpr double GRID_MAX_HEIGHT_DIFF  = 0.2;
-static constexpr int    GRID_MIN_POINTS       = 10;
-static constexpr double GROUND_RANSAC_THRESH  = 0.2;  // livox_clustering(0.3)보다 보수적
+/* ===== 지면 제거 (bbox 매칭 전 전체 클라우드, horizon_ground) ===== */
+static constexpr bool ENABLE_GROUND_REMOVAL = true;
 
 /* ===== 3D bbox gate (cluster AABB: x=length, y=width, z=height) ===== */
 /* bbox 안 클러스터 중 이 게이트를 통과한 것들 가운데 최근접을 채택.
@@ -145,8 +144,6 @@ private:
     void match_and_update_trackers(const std::vector<cv::Point2f> &cents,
                                    double match_dist = MATCH_DIST,
                                    int max_miss = TRACKER_MAX_MISS);
-    std::vector<int> remove_ground_ransac(const std::vector<cv::Point3f> &pts,
-                                          double threshold = GROUND_RANSAC_THRESH);
 
 public:
     explicit LivoxCameraFusion(ros::NodeHandle *nh);

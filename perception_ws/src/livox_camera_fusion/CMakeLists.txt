@@ -41,6 +41,7 @@ include_directories(
 add_executable(${PROJECT_NAME}_node
   src/main.cpp
   src/livox_camera_fusion.cpp
+  src/horizon_ground.cpp
 )
 
 add_dependencies(${PROJECT_NAME}_node

@@ -1,5 +1,5 @@
 <launch>
-  <!-- 시스템 python3 로 실행 (numpy, scipy, scikit-learn 필요) -->
+  <!-- 시스템 python3 로 실행 (numpy, scipy 필요) -->
   <arg name="input_topic"        default="/livox/lidar"/>
   <arg name="centroid_topic"     default="/perception/livox/centroids"/>
   <arg name="preprocessed_topic" default="/perception/livox/preprocessed"/>
@@ -10,6 +10,9 @@
         type="livox_euclidean_clustering.py"
         name="livox_euclidean_clustering"
         output="screen">
+    <!-- numpy BLAS 스레드 1개: 작은 행렬 연산이라 병렬 이득이 없고, 여러 스레드가 CPU 를 점유한다 -->
+    <env name="OPENBLAS_NUM_THREADS" value="1"/>
+    <env name="OMP_NUM_THREADS" value="1"/>
     <rosparam command="load" file="$(arg config)"/>
     <param name="input_topic"        value="$(arg input_topic)"/>
     <param name="centroid_topic"     value="$(arg centroid_topic)"/>

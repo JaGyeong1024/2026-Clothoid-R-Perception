@@ -1,6 +1,6 @@
 # livox_clustering
 
-Livox LiDAR 단독 유클리디안 클러스터링 + 칼만 추적 노드 (Python).
+Livox LiDAR 단독 물체 검출 노드 (Python): 지면 제거 + XY 클러스터링 + 칼만 추적. 카메라 없이 모르는 장애물을 잡는 보조 계통.
 
 ## 토픽
 
@@ -27,22 +27,19 @@ Livox LiDAR 단독 유클리디안 클러스터링 + 칼만 추적 노드 (Pytho
 | `frame_id` | `livox_frame` | 출력 frame_id |
 | `config` | `config/livox_clustering.yaml` | 알고리즘 파라미터 yaml |
 
-> 알고리즘 파라미터(ROI, voxel size, DROR, RANSAC, 클러스터링 임계, 트래커)는 `config/livox_clustering.yaml`에서 기본값을 로드합니다. 현재 값은 기존 코드 상수와 동일합니다.
+> 알고리즘 파라미터(ROI, voxel size, DROR, 클러스터링·물체 조건, 트래커)는 `config/livox_clustering.yaml`에서 로드합니다.
 
 ## 알고리즘 요약
 
 ```
 PointCloud2 read
-  → pitch 보정
-  → ROI 박스 컷
+  → 지면 제거 (horizon_ground: x ≤ 15 m, |y| ≤ 7 m 에서 칸별 지면 평면 추정, 퓨전 노드와 같은 알고리즘)
+  → 발행 ROI 컷 (x 0~8 m, |y| ≤ 3 m)
   → voxel downsample
   → DROR (Dynamic Radius Outlier Removal)
-  → grid 기반 ground 제거
-  → RANSAC 잔류 지면 제거
   → /perception/livox/preprocessed 발행
-  → 거리 가중치 Euclidean clustering
-  → 클러스터 병합 (CLUSTER_MERGE_GAP)
-  → bbox 크기 필터
+  → XY 고정 간격(0.15 m) 연결 성분 클러스터링
+  → 물체 조건: 지면 위 높이 0.3~2.0 m, 수평 최대 변 ≤ 2.5 m
   → 칼만 트래커 매칭/생성/소거
-  → /perception/livox/centroids 발행
+  → /perception/livox/centroids 발행 (3프레임 이상 연속 관측된 트랙)
 ```

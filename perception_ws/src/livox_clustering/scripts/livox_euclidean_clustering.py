@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Livox LiDAR Pre-processing + Distance-weighted Euclidean Clustering + Kalman Tracking
+Livox LiDAR: 지면 제거(horizon_ground) + XY 클러스터링 + Kalman Tracking
 ROS Noetic 기준
 """
 
@@ -11,14 +11,16 @@ from sensor_msgs.msg import PointField
 import sensor_msgs.point_cloud2 as pc2
 from geometry_msgs.msg import Point32
 from scipy.spatial import cKDTree
-from sklearn.linear_model import RANSACRegressor
+from scipy.sparse import coo_matrix
+from scipy.sparse.csgraph import connected_components
 import std_msgs.msg
 
+from livox_clustering import horizon_ground
+
 # ---- 기본 파라미터 (yaml / rosparam 으로 덮어씀) ----
-PITCH_DEG        = 0.1
-ROI_X_MIN, ROI_X_MAX = 0, 12
-ROI_Y_MIN, ROI_Y_MAX = -4, 4
-ROI_Z_MIN, ROI_Z_MAX = -2, 1.5
+ROI_X_MIN, ROI_X_MAX = 0, 8
+ROI_Y_MIN, ROI_Y_MAX = -3, 3
+ROI_Z_MAX        = 1.5
 VOXEL_SIZE       = 0.1
 
 DROR_MIN_NEIGHBORS = 3
@@ -26,74 +28,28 @@ DROR_MIN_RADIUS    = 0.1
 DROR_RADIUS_SCALE  = 0.1
 DROR_MAX_RADIUS    = 0.2
 
-GRID_CELL_SIZE        = 0.2
-GRID_MAX_HEIGHT_DIFF  = 0.2
-GRID_MIN_POINTS       = 10
+# 지면 평면은 발행 ROI 보다 넓은 영역(지면이 보이는 2.9 m ~ 15.6 m)에서 맞춘다
+GROUND_X_MAX, GROUND_Y_ABS, GROUND_Z_ABS = 15.0, 7.0, 2.0
 
-GROUND_THRESH = 0.3
-
-EUCLIDEAN_MIN_CLUSTER_SIZE = 5
-CLUSTER_MERGE_GAP          = 0.5
-MAX_LENGTH, MAX_WIDTH, MAX_HEIGHT = 2.5, 2.5, 1.8   # 높이 1.8: ERP·사람 수용
-MIN_LENGTH, MIN_WIDTH, MIN_HEIGHT = 0.3, 0.3, 0.3   # 0.3: 라바콘(0.37m) 수용
-EUCLIDEAN_BASE_DIST, EUCLIDEAN_DIST_SCALE = 0.05, 0.05
+# 물체: 지면 제거 후 점을 XY 고정 간격으로 묶는다. 콘 벽(콘 간격 ~0.5 m)도 콘 단위로 갈라진다.
+CLUSTER_EPS        = 0.15
+CLUSTER_MIN_POINTS = 3
+OBJ_MIN_HEIGHT     = 0.3    # 지면 평면 위 최고점 높이
+OBJ_MAX_HEIGHT     = 2.0
+OBJ_MAX_FOOTPRINT  = 2.5    # 수평 최대 변
 
 TRACKER_MAX_MISS = 5
 MATCH_DIST       = 1.5
 TRACKER_MIN_HITS = 3   # 이 프레임 수 이상 연속 관측된 트랙만 발행
 
-# 라바콘처럼 작고 높은 물체용 추가 규칙. 큰 물체(ERP·사람) 규칙과 OR 로 묶는다.
-# 지면·풀·박스는 넓고 납작해(종횡비 중앙 0.32) 종횡비로 갈린다 (콘은 2.9~3.0).
-CONE_MAX_FOOTPRINT = 0.5   # 수평 최대 변이 이보다 작아야 콘 후보
-CONE_MIN_HEIGHT    = 0.25
-CONE_MIN_ASPECT    = 1.5   # 높이 / 수평 최대 변
-
 def load_algorithm_params():
-    global PITCH_DEG, ROI_X_MIN, ROI_X_MAX, ROI_Y_MIN, ROI_Y_MAX, ROI_Z_MIN, ROI_Z_MAX
-    global VOXEL_SIZE, DROR_MIN_NEIGHBORS, DROR_MIN_RADIUS, DROR_RADIUS_SCALE, DROR_MAX_RADIUS
-    global GRID_CELL_SIZE, GRID_MAX_HEIGHT_DIFF, GRID_MIN_POINTS, GROUND_THRESH
-    global EUCLIDEAN_MIN_CLUSTER_SIZE, CLUSTER_MERGE_GAP
-    global MAX_LENGTH, MAX_WIDTH, MAX_HEIGHT, MIN_LENGTH, MIN_WIDTH, MIN_HEIGHT
-    global EUCLIDEAN_BASE_DIST, EUCLIDEAN_DIST_SCALE, TRACKER_MAX_MISS, MATCH_DIST, TRACKER_MIN_HITS
-    global CONE_MAX_FOOTPRINT, CONE_MIN_HEIGHT, CONE_MIN_ASPECT
-
-    PITCH_DEG = rospy.get_param("~pitch_deg", PITCH_DEG)
-    ROI_X_MIN = rospy.get_param("~roi_x_min", ROI_X_MIN)
-    ROI_X_MAX = rospy.get_param("~roi_x_max", ROI_X_MAX)
-    ROI_Y_MIN = rospy.get_param("~roi_y_min", ROI_Y_MIN)
-    ROI_Y_MAX = rospy.get_param("~roi_y_max", ROI_Y_MAX)
-    ROI_Z_MIN = rospy.get_param("~roi_z_min", ROI_Z_MIN)
-    ROI_Z_MAX = rospy.get_param("~roi_z_max", ROI_Z_MAX)
-    VOXEL_SIZE = rospy.get_param("~voxel_size", VOXEL_SIZE)
-
-    DROR_MIN_NEIGHBORS = int(rospy.get_param("~dror_min_neighbors", DROR_MIN_NEIGHBORS))
-    DROR_MIN_RADIUS = rospy.get_param("~dror_min_radius", DROR_MIN_RADIUS)
-    DROR_RADIUS_SCALE = rospy.get_param("~dror_radius_scale", DROR_RADIUS_SCALE)
-    DROR_MAX_RADIUS = rospy.get_param("~dror_max_radius", DROR_MAX_RADIUS)
-
-    GRID_CELL_SIZE = rospy.get_param("~grid_cell_size", GRID_CELL_SIZE)
-    GRID_MAX_HEIGHT_DIFF = rospy.get_param("~grid_max_height_diff", GRID_MAX_HEIGHT_DIFF)
-    GRID_MIN_POINTS = int(rospy.get_param("~grid_min_points", GRID_MIN_POINTS))
-    GROUND_THRESH = rospy.get_param("~ground_thresh", GROUND_THRESH)
-
-    EUCLIDEAN_MIN_CLUSTER_SIZE = int(rospy.get_param("~euclidean_min_cluster_size", EUCLIDEAN_MIN_CLUSTER_SIZE))
-    CLUSTER_MERGE_GAP = rospy.get_param("~cluster_merge_gap", CLUSTER_MERGE_GAP)
-    MAX_LENGTH = rospy.get_param("~max_length", MAX_LENGTH)
-    MAX_WIDTH = rospy.get_param("~max_width", MAX_WIDTH)
-    MAX_HEIGHT = rospy.get_param("~max_height", MAX_HEIGHT)
-    MIN_LENGTH = rospy.get_param("~min_length", MIN_LENGTH)
-    MIN_WIDTH = rospy.get_param("~min_width", MIN_WIDTH)
-    MIN_HEIGHT = rospy.get_param("~min_height", MIN_HEIGHT)
-    EUCLIDEAN_BASE_DIST = rospy.get_param("~euclidean_base_dist", EUCLIDEAN_BASE_DIST)
-    EUCLIDEAN_DIST_SCALE = rospy.get_param("~euclidean_dist_scale", EUCLIDEAN_DIST_SCALE)
-
-    TRACKER_MAX_MISS = int(rospy.get_param("~tracker_max_miss", TRACKER_MAX_MISS))
-    MATCH_DIST = rospy.get_param("~match_dist", MATCH_DIST)
-    TRACKER_MIN_HITS = int(rospy.get_param("~tracker_min_hits", TRACKER_MIN_HITS))
-
-    CONE_MAX_FOOTPRINT = rospy.get_param("~cone_max_footprint", CONE_MAX_FOOTPRINT)
-    CONE_MIN_HEIGHT = rospy.get_param("~cone_min_height", CONE_MIN_HEIGHT)
-    CONE_MIN_ASPECT = rospy.get_param("~cone_min_aspect", CONE_MIN_ASPECT)
+    g = globals()
+    for name in ("ROI_X_MIN", "ROI_X_MAX", "ROI_Y_MIN", "ROI_Y_MAX", "ROI_Z_MAX", "VOXEL_SIZE",
+                 "DROR_MIN_RADIUS", "DROR_RADIUS_SCALE", "DROR_MAX_RADIUS",
+                 "CLUSTER_EPS", "OBJ_MIN_HEIGHT", "OBJ_MAX_HEIGHT", "OBJ_MAX_FOOTPRINT", "MATCH_DIST"):
+        g[name] = float(rospy.get_param("~" + name.lower(), g[name]))
+    for name in ("DROR_MIN_NEIGHBORS", "CLUSTER_MIN_POINTS", "TRACKER_MAX_MISS", "TRACKER_MIN_HITS"):
+        g[name] = int(rospy.get_param("~" + name.lower(), g[name]))
 
 # ---------- 보조 클래스 ----------
 class KalmanFilter:
@@ -158,101 +114,38 @@ def parse_xyz_points(msg):
     xyz = xyz[np.isfinite(xyz).all(axis=1)]
     return xyz.astype(np.float64, copy=False)
 
-def rot_pitch(points, deg):
-    th = np.deg2rad(deg)
-    R = np.array([[ np.cos(th),0, np.sin(th)],
-                  [ 0,          1, 0        ],
-                  [-np.sin(th),0, np.cos(th)]])
-    return points @ R.T
-
 def voxel_downsample(pts, vs):
     if len(pts)==0: return pts
     idx = np.unique(np.floor(pts/vs), axis=0, return_index=True)[1]
     return pts[idx]
 
-def dror_filter(pts):
-    if len(pts)==0: return pts
+def dror_mask(pts):
+    """거리 비례 반경 안 이웃이 DROR_MIN_NEIGHBORS 미만인 외톨이 점 제거"""
+    if len(pts)==0: return np.zeros(0, bool)
     rng = np.linalg.norm(pts[:,:2],axis=1)
     radii = np.clip(DROR_MIN_RADIUS + DROR_RADIUS_SCALE*rng,
                     DROR_MIN_RADIUS, DROR_MAX_RADIUS)
     tree = cKDTree(pts)
     counts = tree.query_ball_point(pts, radii, return_length=True)
-    return pts[counts - 1 >= DROR_MIN_NEIGHBORS]
+    return counts - 1 >= DROR_MIN_NEIGHBORS
 
-def grid_ground_remove(pts):
-    if len(pts)==0: return pts
-    ix = np.floor((pts[:,0]-ROI_X_MIN)/GRID_CELL_SIZE).astype(np.int64)
-    iy = np.floor((pts[:,1]-ROI_Y_MIN)/GRID_CELL_SIZE).astype(np.int64)
-    key = ix*100000 + iy
-    _, inv = np.unique(key, return_inverse=True)
-    cnt = np.bincount(inv)
-    min_z = np.full(cnt.size, np.inf)
-    np.minimum.at(min_z, inv, pts[:,2])
-    ground = ((cnt[inv] >= GRID_MIN_POINTS) &
-              (pts[:,2] - min_z[inv] < GRID_MAX_HEIGHT_DIFF))
-    return pts[~ground]
+def cluster_objects(pts, ground):
+    """XY 고정 간격 연결 성분 → 크기·높이 조건을 통과한 클러스터의 XY 중심"""
+    if len(pts) < CLUSTER_MIN_POINTS: return np.zeros((0, 2))
+    pairs = cKDTree(pts[:,:2]).query_pairs(CLUSTER_EPS, output_type="ndarray")
+    g = coo_matrix((np.ones(len(pairs)), (pairs[:,0], pairs[:,1])), shape=(len(pts), len(pts)))
+    _, lbl = connected_components(g, directed=False)
+    a, b, c = ground
+    out = []
+    for l in np.unique(lbl):
+        C = pts[lbl == l]
+        if len(C) < CLUSTER_MIN_POINTS: continue
+        foot = max(np.ptp(C[:,0]), np.ptp(C[:,1]))
+        h = (C[:,2] - (a*C[:,0] + b*C[:,1] + c)).max()
+        if foot <= OBJ_MAX_FOOTPRINT and OBJ_MIN_HEIGHT <= h <= OBJ_MAX_HEIGHT:
+            out.append(C[:,:2].mean(0))
+    return np.asarray(out, float).reshape(-1, 2)
 
-def ransac_ground_remove(pts):
-    if len(pts)==0: return pts
-    X, y = pts[:,:2], pts[:,2]
-    try:
-        ransac = RANSACRegressor(residual_threshold=GROUND_THRESH).fit(X,y)
-        res = np.abs(y - ransac.predict(X))
-        return pts[res>GROUND_THRESH]
-    except Exception:
-        return pts
-
-def dist_euclid_labels(pts):
-    if len(pts)==0: return np.array([],int)
-    tree = cKDTree(pts[:,:2])
-    n = len(pts)
-    visited = np.zeros(n,bool); lbl = -np.ones(n,int); cid=0
-    for i in range(n):
-        if visited[i]: continue
-        d0 = EUCLIDEAN_BASE_DIST + EUCLIDEAN_DIST_SCALE*abs(pts[i,0])
-        Q = tree.query_ball_point(pts[i,:2],d0)
-        if len(Q) < EUCLIDEAN_MIN_CLUSTER_SIZE:
-            visited[i]=True; continue
-        stack = list(Q); lbl[stack]=cid; visited[stack]=True
-        while stack:
-            cur=stack.pop()
-            d = EUCLIDEAN_BASE_DIST+EUCLIDEAN_DIST_SCALE*abs(pts[cur,0])
-            for nb in tree.query_ball_point(pts[cur,:2],d):
-                if not visited[nb]:
-                    visited[nb]=True
-                    if len(tree.query_ball_point(pts[nb,:2],d))>=EUCLIDEAN_MIN_CLUSTER_SIZE:
-                        stack.append(nb)
-                    lbl[nb]=cid
-        cid+=1
-    return lbl
-
-def merge_clusters(pts, lbl):
-    uniq=set(lbl); uniq.discard(-1)
-    if not uniq: return lbl
-    cent={l:np.mean(pts[lbl==l],axis=0) for l in uniq}
-    rep={}; merged=set()
-    for l1 in uniq:
-        if l1 in merged: continue
-        rep[l1]=l1
-        for l2 in uniq:
-            if l1==l2 or l2 in merged: continue
-            if np.linalg.norm(cent[l1][:2]-cent[l2][:2])<CLUSTER_MERGE_GAP:
-                rep[l2]=l1; merged.add(l2)
-    return np.array([rep.get(x,-1) if x!=-1 else -1 for x in lbl])
-
-def bbox_ok(pts):
-    if len(pts)==0: return False
-    xl,yl,zl = np.ptp(pts[:,0]), np.ptp(pts[:,1]), np.ptp(pts[:,2])
-    # 큰 물체 (ERP·사람·드럼)
-    if (MIN_LENGTH<xl<MAX_LENGTH and
-            MIN_WIDTH <yl<MAX_WIDTH  and
-            MIN_HEIGHT<zl<MAX_HEIGHT):
-        return True
-    # 작고 높은 물체 (라바콘). 하한을 낮추는 대신 종횡비로 지면·풀·박스를 배제한다.
-    foot = max(xl, yl)
-    return (foot < CONE_MAX_FOOTPRINT and
-            zl > CONE_MIN_HEIGHT and
-            zl / max(foot, 1e-6) > CONE_MIN_ASPECT)
 
 class LivoxEuclideanClustering:
     def __init__(self):
@@ -289,19 +182,20 @@ class LivoxEuclideanClustering:
         return parse_xyz_points(msg)
 
     def _preprocess(self, pts):
-        pts = rot_pitch(pts, PITCH_DEG)
-        mask = ((ROI_X_MIN <= pts[:, 0]) & (pts[:, 0] <= ROI_X_MAX) &
-                (ROI_Y_MIN <= pts[:, 1]) & (pts[:, 1] <= ROI_Y_MAX) &
-                (ROI_Z_MIN <= pts[:, 2]) & (pts[:, 2] <= ROI_Z_MAX))
-        pts = pts[mask]
-        pts = dror_filter(voxel_downsample(pts, VOXEL_SIZE))
-        return ransac_ground_remove(grid_ground_remove(pts))
+        """지면 제거 → 발행 ROI → voxel → DROR. 반환: 물체 후보 점, 지면 평면"""
+        g = pts[(pts[:, 0] >= 0) & (pts[:, 0] <= GROUND_X_MAX) &
+                (np.abs(pts[:, 1]) <= GROUND_Y_ABS) & (np.abs(pts[:, 2]) <= GROUND_Z_ABS)]
+        if len(g) == 0:
+            return g, (0.0, 0.0, horizon_ground.ZREF)
+        ng, ground = horizon_ground.non_ground(g)
+        q = g[ng]
+        q = q[(ROI_X_MIN <= q[:, 0]) & (q[:, 0] <= ROI_X_MAX) &
+              (ROI_Y_MIN <= q[:, 1]) & (q[:, 1] <= ROI_Y_MAX) & (q[:, 2] <= ROI_Z_MAX)]
+        q = voxel_downsample(q, VOXEL_SIZE)
+        return q[dror_mask(q)], ground
 
-    def _cluster_observations(self, pts):
-        lbl = merge_clusters(pts, dist_euclid_labels(pts))
-        observed = [np.mean(pts[lbl == cid][:, :2], axis=0)
-                    for cid in set(lbl) if cid != -1 and bbox_ok(pts[lbl == cid])]
-        return np.asarray(observed, dtype=float)
+    def _cluster_observations(self, pts, ground):
+        return cluster_objects(pts, ground)
 
     def _track(self, observed):
         preds = np.array([t.predict() for t in self.trackers.values()]) if self.trackers else np.zeros((0, 2))
@@ -337,10 +231,10 @@ class LivoxEuclideanClustering:
             self.publish_centroids([])
             return
 
-        pts = self._preprocess(pts)
+        pts, ground = self._preprocess(pts)
         self.publish_preprocessed(pts)
 
-        observed = self._cluster_observations(pts)
+        observed = self._cluster_observations(pts, ground)
         self._track(observed)
         self.publish_centroids([t.last for t in self.trackers.values()
                                 if t.hits >= TRACKER_MIN_HITS and t.miss == 0])

@@ -1,5 +1,6 @@
 // livox_camera_fusion.cpp
 #include "livox_camera_fusion.h"
+#include "horizon_ground.h"
 
 #include <sensor_msgs/CompressedImage.h>
 #include <sensor_msgs/PointCloud.h>
@@ -10,8 +11,6 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
-#include <numeric>
-#include <random>
 #include <set>
 
 /* ===== KalmanTracker Implementation ===== */
@@ -139,7 +138,7 @@ void LivoxCameraFusion::detectionCallback(
     if (lidar_points.empty())
         return;
 
-    // 지면 제거 (grid + RANSAC)
+    // 지면 제거 (horizon_ground)
     if (ENABLE_GROUND_REMOVAL)
         remove_ground_full(lidar_points, projected_list);
 
@@ -172,6 +171,15 @@ void LivoxCameraFusion::convert_msg(
             continue;
         local->width  = local->points.size();
         local->height = 1;
+        if (local->points.size() > static_cast<size_t>(BBOX_VOXEL_MIN_POINTS))
+        {
+            pcl::PointCloud<pcl::PointXYZ>::Ptr thin(new pcl::PointCloud<pcl::PointXYZ>);
+            pcl::VoxelGrid<pcl::PointXYZ> vg;
+            vg.setInputCloud(local);
+            vg.setLeafSize(BBOX_VOXEL_LEAF, BBOX_VOXEL_LEAF, BBOX_VOXEL_LEAF);
+            vg.filter(*thin);
+            local = thin;
+        }
 
         cv::Point2d centroid;
         cv::Vec3d ext;
@@ -234,58 +242,17 @@ void LivoxCameraFusion::collect_points_in_bbox(
     }
 }
 
-// 전체 클라우드 지면 제거: grid(셀별 min-z) → RANSAC 평면. pts/proj 는 같은 mask 로 필터링.
+// 전체 클라우드 지면 제거 (horizon_ground). pts/proj 는 같은 mask 로 필터링.
 void LivoxCameraFusion::remove_ground_full(std::vector<cv::Point3d> &pts,
                                            std::vector<cv::Point2d> &proj)
 {
-    const size_t n = pts.size();
-    if (n == 0)
-        return;
-
-    // 1) grid: 셀 최저 z 대비 GRID_MAX_HEIGHT_DIFF 이내 점 = 지면 (셀 점 수 >= GRID_MIN_POINTS)
-    std::map<std::pair<int, int>, std::pair<double, int>> cells; // (min_z, count)
-    std::vector<std::pair<int, int>> key(n);
-    for (size_t i = 0; i < n; ++i)
-    {
-        key[i] = {static_cast<int>(std::floor(pts[i].x / GRID_CELL_SIZE)),
-                  static_cast<int>(std::floor(pts[i].y / GRID_CELL_SIZE))};
-        auto it = cells.find(key[i]);
-        if (it == cells.end())
-            cells[key[i]] = {pts[i].z, 1};
-        else
-        {
-            it->second.first = std::min(it->second.first, pts[i].z);
-            it->second.second += 1;
-        }
-    }
-    std::vector<char> keep(n, 1);
-    for (size_t i = 0; i < n; ++i)
-    {
-        const auto &c = cells[key[i]];
-        if (c.second >= GRID_MIN_POINTS && pts[i].z - c.first < GRID_MAX_HEIGHT_DIFF)
-            keep[i] = 0;
-    }
-
-    // 2) grid 통과분에 RANSAC 평면 제거
-    std::vector<cv::Point3f> rem;
-    std::vector<size_t> rem_idx;
-    rem.reserve(n);
-    for (size_t i = 0; i < n; ++i)
-        if (keep[i])
-        {
-            rem.emplace_back(pts[i].x, pts[i].y, pts[i].z);
-            rem_idx.push_back(i);
-        }
-    std::vector<char> keep2(n, 0);
-    for (int id : remove_ground_ransac(rem, GROUND_RANSAC_THRESH))
-        keep2[rem_idx[id]] = 1;
-
+    const std::vector<char> keep = horizon_ground::nonGround(pts);
     std::vector<cv::Point3d> out_pts;
     std::vector<cv::Point2d> out_proj;
-    out_pts.reserve(n);
-    out_proj.reserve(n);
-    for (size_t i = 0; i < n; ++i)
-        if (keep2[i])
+    out_pts.reserve(pts.size());
+    out_proj.reserve(proj.size());
+    for (size_t i = 0; i < pts.size(); ++i)
+        if (keep[i])
         {
             out_pts.push_back(pts[i]);
             out_proj.push_back(proj[i]);
@@ -324,7 +291,7 @@ bool LivoxCameraFusion::select_cluster_centroid(
     pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
     ec.setClusterTolerance(CLUSTER_TOLERANCE);
     ec.setMinClusterSize(CLUSTER_MIN_SIZE);
-    ec.setMaxClusterSize(CLUSTER_MAX_SIZE);
+    ec.setMaxClusterSize(std::numeric_limits<int>::max());
     ec.setSearchMethod(tree);
     ec.setInputCloud(cloud);
     ec.extract(clusters);
@@ -438,52 +405,6 @@ void LivoxCameraFusion::track_and_visualize(const std::vector<cv::Point2d> &cent
     }
 }
 
-/* ===== RANSAC ground removal ===== */
-std::vector<int> LivoxCameraFusion::remove_ground_ransac(
-    const std::vector<cv::Point3f> &pts, double th)
-{
-    if (pts.size() < 10)
-    {
-        std::vector<int> id(pts.size());
-        std::iota(id.begin(), id.end(), 0);
-        return id;
-    }
-    int max_in = 0;
-    double a = 0, b = 0, c = 0;
-    std::default_random_engine gen;
-    std::uniform_int_distribution<> d(0, pts.size() - 1);
-
-    for (int iter = 0; iter < 30; ++iter)
-    {
-        int i1 = d(gen), i2 = d(gen), i3 = d(gen);
-        double x1 = pts[i1].x, y1 = pts[i1].y, z1 = pts[i1].z,
-               x2 = pts[i2].x, y2 = pts[i2].y, z2 = pts[i2].z,
-               x3 = pts[i3].x, y3 = pts[i3].y, z3 = pts[i3].z;
-        double den = x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2);
-        if (std::abs(den) < 1e-6)
-            continue;
-        double ta = (z1 * (y2 - y3) + z2 * (y3 - y1) + z3 * (y1 - y2)) / den;
-        double tb = (x1 * (z2 - z3) + x2 * (z3 - z1) + x3 * (z1 - z2)) / den;
-        double tc = z1 - ta * x1 - tb * y1;
-
-        int in = 0;
-        for (const auto &p : pts)
-            if (std::abs(p.z - (ta * p.x + tb * p.y + tc)) < th)
-                ++in;
-        if (in > max_in)
-        {
-            max_in = in;
-            a = ta;
-            b = tb;
-            c = tc;
-        }
-    }
-    std::vector<int> idx;
-    for (size_t i = 0; i < pts.size(); ++i)
-        if (std::abs(pts[i].z - (a * pts[i].x + b * pts[i].y + c)) > th)
-            idx.push_back((int)i);
-    return idx;
-}
 
 /* ===== publish 2D PointCloud ===== */
 void LivoxCameraFusion::publish_2D_pointcloud(

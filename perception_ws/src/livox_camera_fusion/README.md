@@ -37,12 +37,11 @@ Livox LiDAR + 카메라 YOLO 결과를 시간 동기화하여 객체의 중점 �
 ## 알고리즘 요약
 
 ```
-LiDAR + Camera + YOLO 동기화
+LiDAR + Camera + YOLO 동기화 (ApproximateTime, 최대 간격 50 ms)
   → projection_matrix로 LiDAR → 카메라 픽셀 좌표 투영
-  → 각 YOLO bbox 안의 LiDAR 포인트 추출
-  → bbox 중심 기준 ROI 반경 컷
-  → RANSAC 지면 제거
-  → Euclidean clustering → 가장 큰 클러스터의 (x, y) 중심
-  → 칼만 추적 (전역 trackers)
-  → /perception/fusion/centroids 발행
+  → 3D ROI (x 0~15 m, |y| ≤ 7 m, |z| ≤ 2 m)
+  → 전체 클라우드 지면 제거 (horizon_ground: Livox Horizon 시야 안 칸별 지면 평면)
+  → 각 YOLO bbox 안의 LiDAR 포인트 추출 (1000점 초과면 5 cm 복셀로 솎음)
+  → Euclidean clustering (점 수 상한 없음) → 크기 게이트 통과 클러스터 중 최근접의 (x, y) 중심
+  → /perception/fusion/centroids 발행 (YOLO 박스가 없거나 못 찾으면 빈 목록)
 ```
