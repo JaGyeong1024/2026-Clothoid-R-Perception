@@ -1,4 +1,4 @@
-#!/home/a/anaconda3/envs/yolo/bin/python
+#!/home/cnu/anaconda3/envs/yoloTRT/bin/python
 import os
 import sys
 import logging
@@ -45,22 +45,31 @@ DEFAULT_POSTPROCESS_DEBUG = False
 # publish 값을 True로 둔 클래스만 /perception/camera/yolo 토픽으로 publish 합니다.
 # name: 로그와 디버그 화면에 표시할 클래스 이름입니다.
 # publish: True이면 해당 클래스를 publish하고, False이면 검출되어도 버립니다.
-# confidence: 클래스별 최소 신뢰도입니다. 이 값보다 낮은 bbox는 publish하지 않습니다.
+# confidence: 진입 신뢰도입니다. 새로 나타난 bbox는 이 값 이상이어야 publish합니다.
+# keep_confidence: 유지 신뢰도입니다(히스테리시스). 직전 프레임 bbox와 매칭된 객체는
+#                  이 값 이상이면 계속 publish해서 bbox 깜빡임을 막습니다.
+# track_iou: 직전 프레임 bbox와 같은 객체로 볼 최소 IoU입니다.
 DEFAULT_CLASS_CONFIG = {
     0: {
         "name": "ERP-42",
         "publish": True,
         "confidence": 0.5,
+        "keep_confidence": 0.3,
+        "track_iou": 0.3,
     },
     1: {
         "name": "drum",
-        "publish": False,
+        "publish": True,
         "confidence": 0.5,
+        "keep_confidence": 0.3,
+        "track_iou": 0.3,
     },
     2: {
         "name": "cone",
-        "publish": False,
+        "publish": True,
         "confidence": 0.5,
+        "keep_confidence": 0.3,
+        "track_iou": 0.3,
     },
 }
 
@@ -238,17 +247,33 @@ class YoloDetectNode:
         self.class_config[0]["confidence"] = self.erp42_confidence
         self.class_config[1]["confidence"] = self.drum_confidence
         self.class_config[2]["confidence"] = self.cone_confidence
+        self.class_config[0]["keep_confidence"] = rospy.get_param(
+            "~erp42_keep_confidence",
+            self.class_config[0]["keep_confidence"],
+        )
+        self.class_config[1]["keep_confidence"] = rospy.get_param(
+            "~drum_keep_confidence",
+            self.class_config[1]["keep_confidence"],
+        )
+        self.class_config[2]["keep_confidence"] = rospy.get_param(
+            "~cone_keep_confidence",
+            self.class_config[2]["keep_confidence"],
+        )
         self.publish_classes = {
             class_id
             for class_id, config in self.class_config.items()
             if config["publish"]
         }
+        # 유지 신뢰도(keep_confidence) 구간의 bbox도 받아야 하므로
+        # 모델 추론 conf는 진입/유지 신뢰도 중 가장 낮은 값으로 설정합니다.
         published_confidences = [
-            config["confidence"]
+            min(config["confidence"], config["keep_confidence"])
             for config in self.class_config.values()
             if config["publish"]
         ]
         self.conf_thres = min(published_confidences) if published_confidences else 1.0
+        # 직전 프레임에서 publish한 bbox 목록입니다(히스테리시스 매칭용).
+        self.prev_detections = []
 
         self.pub = rospy.Publisher(publish_topic, Yolo_Objects, queue_size=1)
 
@@ -268,6 +293,13 @@ class YoloDetectNode:
         )
         rospy.loginfo(
             f"[yolo_detect_node] cone_confidence: {self.cone_confidence}"
+        )
+        rospy.loginfo(
+            "[yolo_detect_node] keep_confidence / track_iou: "
+            + ", ".join(
+                f"{config['name']}={config['keep_confidence']}/{config['track_iou']}"
+                for config in self.class_config.values()
+            )
         )
         rospy.loginfo(
             f"[yolo_detect_node] publish_classes: "
@@ -308,6 +340,13 @@ class YoloDetectNode:
         for line in status_lines:
             print(line)
 
+    def _matches_prev(self, det, track_iou):
+        # 직전 프레임에 같은 클래스이면서 IoU가 track_iou 이상인 bbox가 있으면 같은 객체로 봅니다.
+        return any(
+            prev["cls_id"] == det["cls_id"] and iou(prev, det) >= track_iou
+            for prev in self.prev_detections
+        )
+
     def callback(self, msg: CompressedImage):
         frame = cv2.imdecode(np.frombuffer(msg.data, np.uint8), cv2.IMREAD_COLOR)
 
@@ -334,17 +373,24 @@ class YoloDetectNode:
             if class_config is None or not class_config["publish"]:
                 continue
 
-            if conf < class_config["confidence"]:
-                continue
-
-            publish_candidates.append({
+            candidate = {
                 "cls_id": cls_id,
                 "conf": conf,
                 "x1": x1,
                 "y1": y1,
                 "x2": x2,
                 "y2": y2,
-            })
+            }
+
+            # 히스테리시스: 새 객체는 confidence 이상, 직전 프레임 bbox와
+            # 매칭된 객체는 keep_confidence 이상이면 통과시킵니다.
+            if conf < class_config["confidence"]:
+                if conf < class_config["keep_confidence"]:
+                    continue
+                if not self._matches_prev(candidate, class_config["track_iou"]):
+                    continue
+
+            publish_candidates.append(candidate)
 
         filtered_count = len(publish_candidates)
         publish_candidates = postprocess_detections(
@@ -354,6 +400,9 @@ class YoloDetectNode:
             area_weight=self.postprocess_area_weight,
             max_det=self.postprocess_max_det,
         )
+
+        # 다음 프레임의 히스테리시스 매칭 기준으로 저장합니다.
+        self.prev_detections = [det.copy() for det in publish_candidates]
 
         if self.postprocess_debug:
             rospy.loginfo(

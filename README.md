@@ -216,7 +216,7 @@ sudo python3 -m pip install --no-cache-dir \
   filterpy==1.4.5 lap==0.5.12
 ```
 
-YOLO env: the `yolo26` node runs in a conda env through its shebang (`#!/home/cnu/anaconda3/envs/yolo/bin/python`). That env needs:
+YOLO env: the `yolo26` node runs in a conda env through its shebang (`#!/home/cnu/anaconda3/envs/yoloTRT/bin/python`). That env needs:
 - the custom ultralytics in `perception_ws/yolo26` (referenced by `yolo_detect.py` with a relative path)
 - `torch`, `numpy`, `opencv-python`, `rospkg`, `ultralytics-thop` (see `docker/requirements-yolo.txt`)
 
