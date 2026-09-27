@@ -217,7 +217,7 @@ sudo python3 -m pip install --no-cache-dir \
 ```
 
 YOLO env: the `yolo26` node runs in a conda env through its shebang (`#!/home/cnu/anaconda3/envs/yoloTRT/bin/python`). That env needs:
-- the custom ultralytics in `perception_ws/yolo26` (referenced by `yolo_detect.py` with a relative path)
+- the custom ultralytics in `perception_ws/yolo26` (`yolo_detect.py` resolves it relative to its own location)
 - `torch`, `numpy`, `opencv-python`, `rospkg`, `ultralytics-thop` (see `docker/requirements-yolo.txt`)
 
 OC-SORT:

@@ -11,7 +11,8 @@ from detect_msgs.msg import Objects, Yolo_Objects
 from sensor_msgs.msg import CompressedImage
 from std_msgs.msg import Header
 
-sys.path.insert(0, "/home/a/2026-Clothoid-R-Perception/perception_ws/yolo26")
+# vendored ultralytics (YOLO26) in perception_ws/yolo26, resolved from this file so any clone location works
+sys.path.insert(0, os.path.normpath(os.path.join(os.path.dirname(os.path.realpath(__file__)), "../../../yolo26")))
 from ultralytics import YOLO
 
 logging.getLogger("ultralytics").setLevel(logging.ERROR)
