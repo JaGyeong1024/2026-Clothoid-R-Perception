@@ -29,7 +29,7 @@ Clothoid-R 자율주행 시스템의 Perception ROS workspace.
   <a href="https://github.com/jendarc"><img src="https://github.com/jendarc.png?size=200" width="100px;" alt=""/><br /><sub><b>김제은</b></sub></a><br />LiDAR, Deep Learning
 </td>
 <td align="center" width="180">
-  <img src="https://github.com/ghost.png?size=200" width="100px;" alt=""/><br /><sub><b>진채민</b></sub><br />LiDAR, Deep Learning
+  <a href="https://github.com/okiogummy"><img src="https://github.com/okiogummy.png?size=200" width="100px;" alt=""/><br /><sub><b>진채민</b></sub></a><br />LiDAR, Deep Learning
 </td>
 </tr>
 </table>
