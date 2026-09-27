@@ -9,7 +9,7 @@ import torch.nn.functional as F
 
 from ultralytics.utils.torch_utils import fuse_conv_and_bn
 
-from .conv import Conv, DWConv, GhostConv, LightConv, RepConv, autopad
+from .conv import Conv, DWConv, GhostConv, LightConv, RepConv, apply_exact_channel_config, autopad
 from .transformer import TransformerBlock
 
 __all__ = (
@@ -208,7 +208,7 @@ class SPP(nn.Module):
 class SPPF(nn.Module):
     """Spatial Pyramid Pooling - Fast (SPPF) layer for YOLOv5 by Glenn Jocher."""
 
-    def __init__(self, c1: int, c2: int, k: int = 5, n: int = 3, shortcut: bool = False):
+    def __init__(self, c1: int, c2: int, k: int = 5, n: int = 3, shortcut: bool = False, exact=None):
         """Initialize the SPPF layer with given input/output channels and kernel size.
 
         Args:
@@ -229,12 +229,13 @@ class SPPF(nn.Module):
 
 
         super().__init__()
-        c_ = c1 // 2  # hidden channels
+        c_ = exact.get("conv", {}).get("cv1", [None, c1 // 2])[1] if isinstance(exact, dict) else c1 // 2
         self.cv1 = Conv(c1, c_, 1, 1, act=False)
         self.cv2 = Conv(c_ * (n + 1), c2, 1, 1)
         self.m = nn.MaxPool2d(kernel_size=k, stride=1, padding=k // 2)
         self.n = n
         self.add = shortcut and c1 == c2
+        apply_exact_channel_config(self, exact)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Apply sequential pooling operations to input and return concatenated feature maps."""
@@ -1119,7 +1120,17 @@ class C3k2(C2f):
             g (int): Groups for convolutions.
             shortcut (bool): Whether to use shortcut connections.
         """
+        exact = attn if isinstance(attn, dict) else g if isinstance(g, dict) else shortcut if isinstance(shortcut, dict) else None
+        if isinstance(attn, dict):
+            attn = False
+        if isinstance(g, dict):
+            g = 1
+        if isinstance(shortcut, dict):
+            shortcut = True
+
         super().__init__(c1, c2, n, shortcut, g, e)
+        if isinstance(exact, dict) and "c" in exact.get("attrs", {}):
+            self.c = int(exact["attrs"]["c"])
         self.m = nn.ModuleList(
             nn.Sequential(
                 Bottleneck(self.c, self.c, shortcut, g),
@@ -1131,6 +1142,7 @@ class C3k2(C2f):
             else Bottleneck(self.c, self.c, shortcut, g)
             for _ in range(n)
         )
+        apply_exact_channel_config(self, exact)
 
     def recon(self, remain_in_channels, c3k):
         #import pdb; pdb.set_trace()
@@ -1602,7 +1614,7 @@ class C2PSA(nn.Module):
         This module essentially is the same as PSA module, but refactored to allow stacking more PSABlock modules.
     """
 
-    def __init__(self, c1: int, c2: int, n: int = 1, e: float = 0.5):
+    def __init__(self, c1: int, c2: int, n: int = 1, e: float = 0.5, exact=None):
         """Initialize C2PSA module.
 
         Args:
@@ -1619,11 +1631,12 @@ class C2PSA(nn.Module):
 
         super().__init__()
         assert c1 == c2
-        self.c = int(c1 * e)
+        self.c = int(exact["attrs"]["c"]) if isinstance(exact, dict) and "c" in exact.get("attrs", {}) else int(c1 * e)
         self.cv1 = Conv(c1, 2 * self.c, 1, 1)
         self.cv2 = Conv(2 * self.c, c1, 1)
 
         self.m = nn.Sequential(*(PSABlock(self.c, attn_ratio=0.5, num_heads=self.c // 64) for _ in range(n)))
+        apply_exact_channel_config(self, exact)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Process the input tensor through a series of PSA blocks.

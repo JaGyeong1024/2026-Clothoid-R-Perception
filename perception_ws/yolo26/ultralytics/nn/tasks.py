@@ -1758,141 +1758,6 @@ def load_checkpoint(weight, device=None, inplace=True, fuse=False):
     return model, ckpt
 
 
-def _set_submodule(module, name, child):
-    """Replace a dotted child module path on a PyTorch module."""
-    parts = name.split(".")
-    parent = module.get_submodule(".".join(parts[:-1])) if len(parts) > 1 else module
-    key = parts[-1]
-    if isinstance(parent, (nn.Sequential, nn.ModuleList)) and key.isdigit():
-        parent[int(key)] = child
-    else:
-        setattr(parent, key, child)
-
-
-def _single_or_tuple(value):
-    """Return a scalar for repeated 2D tuples, otherwise keep the original value."""
-    return value[0] if isinstance(value, tuple) and len(value) == 2 and value[0] == value[1] else value
-
-
-def _replace_exact_conv(module, name, spec):
-    """Resize a Conv/DWConv wrapper or raw Conv2d from an exact YAML spec."""
-    c1, c2, groups = (int(x) for x in spec)
-    old = module.get_submodule(name)
-
-    if isinstance(old, (Conv, DWConv)):
-        conv = old.conv
-        new = Conv(
-            c1,
-            c2,
-            k=_single_or_tuple(conv.kernel_size),
-            s=_single_or_tuple(conv.stride),
-            p=_single_or_tuple(conv.padding),
-            g=groups,
-            d=_single_or_tuple(conv.dilation),
-            act=old.act,
-        )
-    elif isinstance(old, nn.Conv2d):
-        new = nn.Conv2d(
-            c1,
-            c2,
-            kernel_size=old.kernel_size,
-            stride=old.stride,
-            padding=old.padding,
-            dilation=old.dilation,
-            groups=groups,
-            bias=old.bias is not None,
-            padding_mode=old.padding_mode,
-        )
-    else:
-        raise TypeError(f"exact conv spec '{name}' points to unsupported module type {old.__class__.__name__}")
-
-    _set_submodule(module, name, new)
-
-
-def _module_out_channels(module):
-    """Return output channels for Conv-like modules."""
-    if isinstance(module, (Conv, DWConv)):
-        return module.conv.out_channels
-    if isinstance(module, nn.Conv2d):
-        return module.out_channels
-    if isinstance(module, nn.Sequential):
-        for child in reversed(module):
-            out_channels = _module_out_channels(child)
-            if out_channels is not None:
-                return out_channels
-    return None
-
-
-def _reconcile_exact_sequential_inputs(module):
-    """Adjust raw Conv2d inputs that depend on exact-resized preceding layers."""
-    for seq in module.modules():
-        if not isinstance(seq, nn.Sequential):
-            continue
-
-        previous_out = None
-        for name, child in list(seq._modules.items()):
-            if isinstance(child, nn.Conv2d) and previous_out is not None and child.in_channels != previous_out:
-                if child.groups == 1:
-                    child = nn.Conv2d(
-                        previous_out,
-                        child.out_channels,
-                        kernel_size=child.kernel_size,
-                        stride=child.stride,
-                        padding=child.padding,
-                        dilation=child.dilation,
-                        groups=child.groups,
-                        bias=child.bias is not None,
-                        padding_mode=child.padding_mode,
-                    )
-                    seq._modules[name] = child
-
-            out_channels = _module_out_channels(child)
-            if out_channels is not None:
-                previous_out = out_channels
-
-
-def _infer_attention_heads(dim, qkv_channels):
-    """Infer Attention head count from exact qkv dimensions."""
-    candidates = []
-    for heads in range(1, dim + 1):
-        if dim % heads:
-            continue
-        head_dim = dim // heads
-        key_dim = int(head_dim * 0.5)
-        if heads * (2 * key_dim + head_dim) == qkv_channels:
-            candidates.append(heads)
-
-    default_heads = max(dim // 64, 1)
-    return default_heads if default_heads in candidates else (candidates[-1] if candidates else default_heads)
-
-
-def _refresh_exact_attention(module):
-    """Refresh Attention metadata after exact channel replacement."""
-    for child in module.modules():
-        if child.__class__.__name__ != "Attention" or not hasattr(child, "qkv"):
-            continue
-        conv = child.qkv.conv
-        dim = conv.in_channels
-        heads = _infer_attention_heads(dim, conv.out_channels)
-        child.num_heads = heads
-        child.head_dim = dim // heads
-        child.key_dim = int(child.head_dim * 0.5)
-        child.scale = child.key_dim**-0.5
-
-
-def _apply_exact_yaml_spec(module, exact_spec):
-    """Apply optional exact pruned-channel metadata saved in a model YAML layer."""
-    if not exact_spec:
-        return
-
-    for name, value in (exact_spec.get("attrs") or {}).items():
-        setattr(module, name, value)
-    for name, spec in (exact_spec.get("conv") or {}).items():
-        _replace_exact_conv(module, name, spec)
-    _reconcile_exact_sequential_inputs(module)
-    _refresh_exact_attention(module)
-
-
 def parse_model(d, ch, verbose=True):
     """Parse a YOLO model.yaml dictionary into a PyTorch model.
 
@@ -2005,7 +1870,6 @@ def parse_model(d, ch, verbose=True):
             if isinstance(a, str):
                 with contextlib.suppress(ValueError):
                     args[j] = locals()[a] if a in locals() else ast.literal_eval(a)
-        exact_spec = args.pop() if args and isinstance(args[-1], dict) and args[-1].get("exact") else None
         n = n_ = max(round(n * depth), 1) if n > 1 else n  # depth gain
         if m in base_modules:
             c1, c2 = ch[f], args[0]
@@ -2058,7 +1922,10 @@ def parse_model(d, ch, verbose=True):
                 OBB26,
             }
         ):
+            exact = args.pop() if args and isinstance(args[-1], dict) and args[-1].get("exact") else None
             args.extend([reg_max, end2end, [ch[x] for x in f]])
+            if exact is not None:
+                args.append(exact)
             if m is Segment or m is YOLOESegment or m is Segment26 or m is YOLOESegment26:
                 args[2] = int(args[2]) if exact_channels else make_divisible(min(args[2], max_channels) * width, 8)
             if m in {Detect, YOLOEDetect, Segment, Segment26, YOLOESegment, YOLOESegment26, Pose, Pose26, OBB, OBB26}:
@@ -2086,7 +1953,6 @@ def parse_model(d, ch, verbose=True):
         # print(f"[BUILD BEFORE] i={i}, from={f}, n={n}, module={m}, args={args}", flush=True)
 
         m_ = torch.nn.Sequential(*(m(*args) for _ in range(n))) if n > 1 else m(*args)  # module
-        _apply_exact_yaml_spec(m_, exact_spec)
         
         # print(f"[BUILD AFTER ] i={i}, module={m_.__class__.__name__}", flush=True)
 

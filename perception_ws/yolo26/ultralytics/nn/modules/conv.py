@@ -10,6 +10,7 @@ import torch
 import torch.nn as nn
 
 __all__ = (
+    "apply_exact_channel_config",
     "CBAM",
     "ChannelAttention",
     "Concat",
@@ -159,6 +160,65 @@ class Conv(nn.Module):
     def get_remain_out_channels(self):
         remain_out_channels = torch.where(torch.norm(self.conv.weight, p=2, dim=(1, 2, 3)) != 0)[0].tolist()
         return remain_out_channels
+
+
+def _conv_shape(shape):
+    if isinstance(shape, dict):
+        return int(shape["in"]), int(shape["out"]), int(shape.get("groups", 1))
+    return int(shape[0]), int(shape[1]), int(shape[2] if len(shape) > 2 else 1)
+
+
+def _replace_conv2d(conv, in_channels, out_channels, groups):
+    bias = conv.bias is not None
+    return nn.Conv2d(
+        in_channels,
+        out_channels,
+        conv.kernel_size,
+        conv.stride,
+        conv.padding,
+        conv.dilation,
+        groups,
+        bias=bias,
+        padding_mode=conv.padding_mode,
+    )
+
+
+def _set_child(root, name, module):
+    parent = root
+    parts = name.split(".")
+    for part in parts[:-1]:
+        parent = parent[int(part)] if part.isdigit() else getattr(parent, part)
+    last = parts[-1]
+    if last.isdigit():
+        parent[int(last)] = module
+    else:
+        setattr(parent, last, module)
+
+
+def apply_exact_channel_config(module, exact):
+    """Apply saved pruned Conv/Conv2d channel shapes to a freshly built YAML module."""
+    if not isinstance(exact, dict) or not exact.get("exact"):
+        return
+
+    for name, value in exact.get("attrs", {}).items():
+        setattr(module, name, value)
+
+    modules = dict(module.named_modules())
+    for name, shape in exact.get("conv", {}).items():
+        target = module if name in ("", "_self") else modules.get(name)
+        if not isinstance(target, Conv):
+            continue
+        in_channels, out_channels, groups = _conv_shape(shape)
+        target.conv = _replace_conv2d(target.conv, in_channels, out_channels, groups)
+        target.bn = nn.BatchNorm2d(out_channels)
+
+    modules = dict(module.named_modules())
+    for name, shape in exact.get("conv2d", {}).items():
+        target = modules.get(name)
+        if not isinstance(target, nn.Conv2d):
+            continue
+        in_channels, out_channels, groups = _conv_shape(shape)
+        _set_child(module, name, _replace_conv2d(target, in_channels, out_channels, groups))
 
 
 class Conv2(Conv):

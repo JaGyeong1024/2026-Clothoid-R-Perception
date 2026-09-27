@@ -16,7 +16,7 @@ from ultralytics.utils.tal import dist2bbox, dist2rbox, make_anchors
 from ultralytics.utils.torch_utils import TORCH_1_11, fuse_conv_and_bn, smart_inference_mode
 
 from .block import DFL, SAVPE, BNContrastiveHead, ContrastiveHead, Proto, Proto26, RealNVP, Residual, SwiGLUFFN
-from .conv import Conv, DWConv
+from .conv import Conv, DWConv, apply_exact_channel_config
 from .transformer import MLP, DeformableTransformerDecoder, DeformableTransformerDecoderLayer
 from .utils import bias_init_with_prob, linear_init
 
@@ -86,7 +86,7 @@ class Detect(nn.Module):
     legacy = False  # backward compatibility for v3/v5/v8/v9 models
     xyxy = False  # xyxy or xywh output
 
-    def __init__(self, nc: int = 80, reg_max=16, end2end=False, ch: tuple = ()):
+    def __init__(self, nc: int = 80, reg_max=16, end2end=False, ch: tuple = (), exact=None):
         """Initialize the YOLO detection layer with specified number of classes and channels.
 
         Args:
@@ -122,6 +122,7 @@ class Detect(nn.Module):
         if end2end:
             self.one2one_cv2 = copy.deepcopy(self.cv2)
             self.one2one_cv3 = copy.deepcopy(self.cv3)
+        apply_exact_channel_config(self, exact)
 
     @property
     def one2many(self):

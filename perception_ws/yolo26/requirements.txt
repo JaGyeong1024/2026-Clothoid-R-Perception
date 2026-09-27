@@ -1,3 +1,11 @@
+# =====================================================================
+# 배포 / 환경 구축 (fresh machine)
+#   conda create -n yolo python=3.10 -y && conda activate yolo
+#   cd yolo26
+#   pip install -r requirements.txt          # 아래 목록 + 마지막 줄의 포크(-e .) 설치
+#   sudo apt-get install -y graphviz         # visualize_model.py 그래프 렌더용(dot)
+# =====================================================================
+
 torch==2.2.2
 torchvision==0.17.2
 timm==1.0.14
@@ -16,3 +24,25 @@ huggingface-hub==0.23.2
 safetensors==0.4.3
 numpy==1.26.4
 supervision==0.22.0
+
+# --- ultralytics(포크) 런타임 의존성 : 없으면 `from ultralytics import YOLO` 실패 ---
+matplotlib>=3.3.0
+pillow>=7.1.2
+requests>=2.23.0
+tqdm>=4.64.0
+pandas>=1.1.4
+seaborn>=0.11.0
+ultralytics-thop>=2.0.0
+
+# --- visualize_model.py (모델 구조 -> 그래프) ---
+graphviz>=0.20            # 파이썬 바인딩. 시스템 `dot` 실행파일은 apt 로 별도 설치
+
+# --- build_trt_engine.py : ONNX -> TensorRT 엔진 빌드 ([2] 단계) ---
+# CUDA 12 + torch cu121 기준. 다른 CUDA 면 tensorrt-cu13 등으로 교체.
+# NVIDIA GPU + 드라이버 필요. tensorrt-cu12-bindings / -libs 가 함께 설치됨(약 1GB).
+tensorrt-cu12==10.7.0
+# pycuda>=2024.1          # (후속) infer_engine.py 로 엔진 추론할 때 필요
+
+# --- 이 repo 의 커스텀 ultralytics 포크를 'ultralytics' 로 설치 (editable) ---
+# requirements.txt 가 있는 yolo26/ 안에서 pip install 을 실행해야 경로가 맞음
+-e .

@@ -1,4 +1,4 @@
-#!/home/cnu/anaconda3/envs/yolo/bin/python
+#!/home/a/anaconda3/envs/yolo/bin/python
 import os
 import sys
 import logging
@@ -11,17 +11,17 @@ from detect_msgs.msg import Objects, Yolo_Objects
 from sensor_msgs.msg import CompressedImage
 from std_msgs.msg import Header
 
-# 커스텀 ultralytics (perception_ws/yolo26)
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "yolo26")))
+sys.path.insert(0, "/home/a/Clothoid-R/perception_ws/yolo26")
 from ultralytics import YOLO
 
 logging.getLogger("ultralytics").setLevel(logging.ERROR)
 warnings.filterwarnings("ignore", category=UserWarning)
 
-# 검출 영상 창 표시. rosparam ~show_image 로 덮어씀 (headless 기본 False)
-SHOW_DETECTION_IMAGE = False
+# True 이면 검출 결과 영상을 화면에 띄우고, False 이면 화면 출력 없이 ROS 토픽만 publish 합니다.
+SHOW_DETECTION_IMAGE = True
 
-# True면 검출 로그를 제자리에서 갱신 (초기화 로그는 유지)
+# True 이면 검출 결과 로그 영역만 갱신해서 현재 상태만 깔끔하게 보여줍니다.
+# 초기화 로그(MODEL LOADED, pt_weights 등)는 그대로 유지됩니다.
 CLEAR_TERMINAL_ON_DETECTION = False
 
 WINDOW_NAME = "YOLO BBox"
@@ -29,9 +29,11 @@ DEFAULT_SOURCE_TOPIC = "/camera/image_raw/compressed"
 DEFAULT_PUBLISH_TOPIC = "/perception/camera/yolo"
 DEFAULT_FRAME_ID = "camera_link"
 PACKAGE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-# 구조는 yaml, 가중치는 checkpoint에서 로드
-DEFAULT_YAML_CFG = os.path.join(PACKAGE_DIR, "models", "best.yaml")
-DEFAULT_PT_WEIGHTS = os.path.join(PACKAGE_DIR, "models", "best.pt")
+# TensorRT 엔진 파일(best.engine)을 직접 로딩해서 추론합니다.
+DEFAULT_ENGINE_WEIGHTS = os.path.join(PACKAGE_DIR, "models", "best.engine")
+# 학습(imgsz=640)과 동일하게 추론 입력을 640x640 으로 맞춥니다.
+# best.engine 은 정적 입력 [1, 3, 640, 640] 로 빌드되어 있어 이 값이어야 합니다.
+DEFAULT_INFER_IMGSZ = 640
 DEFAULT_POSTPROCESS_NMS_IOU = 0.5
 DEFAULT_POSTPROCESS_CONTAINMENT_IOA = 0.8
 DEFAULT_POSTPROCESS_AREA_WEIGHT = 0.1
@@ -39,7 +41,11 @@ DEFAULT_POSTPROCESS_MAX_DET = 0
 DEFAULT_POSTPROCESS_DEBUG = False
 
 
-# 클래스별 설정. publish=False 면 검출돼도 버리고, confidence 미만 bbox 는 버린다.
+# 클래스별 기본 설정입니다.
+# publish 값을 True로 둔 클래스만 /perception/camera/yolo 토픽으로 publish 합니다.
+# name: 로그와 디버그 화면에 표시할 클래스 이름입니다.
+# publish: True이면 해당 클래스를 publish하고, False이면 검출되어도 버립니다.
+# confidence: 클래스별 최소 신뢰도입니다. 이 값보다 낮은 bbox는 publish하지 않습니다.
 DEFAULT_CLASS_CONFIG = {
     0: {
         "name": "ERP-42",
@@ -192,14 +198,10 @@ class YoloDetectNode:
             for class_id, config in DEFAULT_CLASS_CONFIG.items()
         }
         self.previous_status_line_count = 0
-        global SHOW_DETECTION_IMAGE
-        SHOW_DETECTION_IMAGE = bool(rospy.get_param("~show_image", SHOW_DETECTION_IMAGE))
-        # 추론 해상도. 0 = 원본(학습 해상도). 저해상도로 재학습하면 여기에 맞춘다.
-        self.imgsz = int(rospy.get_param("~imgsz", 0))
         source_topic = rospy.get_param("~source", DEFAULT_SOURCE_TOPIC)
         publish_topic = rospy.get_param("~output_topic", DEFAULT_PUBLISH_TOPIC)
-        yaml_cfg = rospy.get_param("~yaml_cfg", DEFAULT_YAML_CFG)
-        pt_weights = rospy.get_param("~pt_weights", DEFAULT_PT_WEIGHTS)
+        engine_weights = rospy.get_param("~engine_weights", DEFAULT_ENGINE_WEIGHTS)
+        self.infer_imgsz = rospy.get_param("~imgsz", DEFAULT_INFER_IMGSZ)
         self.frame_id = rospy.get_param("~frame_id", DEFAULT_FRAME_ID)
         self.postprocess_nms_iou = rospy.get_param(
             "~postprocess_nms_iou",
@@ -250,10 +252,10 @@ class YoloDetectNode:
 
         self.pub = rospy.Publisher(publish_topic, Yolo_Objects, queue_size=1)
 
-        self.model = YOLO(yaml_cfg, task="detect").load(pt_weights)
+        self.model = YOLO(engine_weights, task="detect")
         rospy.loginfo(f"[yolo_detect_node] YOLOv12 MODEL LOADED")
-        rospy.loginfo(f"[yolo_detect_node] yaml_cfg: {yaml_cfg}")
-        rospy.loginfo(f"[yolo_detect_node] pt_weights: {pt_weights}")
+        rospy.loginfo(f"[yolo_detect_node] engine_weights: {engine_weights}")
+        rospy.loginfo(f"[yolo_detect_node] infer imgsz: {self.infer_imgsz}")
         rospy.loginfo(f"[yolo_detect_node] frame_id: {self.frame_id}")
         rospy.loginfo(
             f"[yolo_detect_node] inference confidence: {self.conf_thres}"
@@ -308,10 +310,11 @@ class YoloDetectNode:
 
     def callback(self, msg: CompressedImage):
         frame = cv2.imdecode(np.frombuffer(msg.data, np.uint8), cv2.IMREAD_COLOR)
-        h0, w0 = frame.shape[:2]
 
-        imgsz = self.imgsz if self.imgsz > 0 else (h0, w0)
-        results = self.model(frame, imgsz=imgsz, conf=self.conf_thres)[0]
+        # 학습과 동일하게 640x640 으로 추론합니다. 원본 프레임(1920x1080)은
+        # Ultralytics LetterBox 가 비율 유지 + 패딩으로 640x640 에 맞추고,
+        # results.boxes.xyxy 는 다시 원본 해상도 좌표로 복원되어 나옵니다.
+        results = self.model(frame, imgsz=self.infer_imgsz, conf=self.conf_thres)[0]
 
         frame_id = msg.header.frame_id if msg.header.frame_id else self.frame_id
         out = Yolo_Objects()
