@@ -34,3 +34,8 @@ __pycache__/
 *.swp
 *~
 .DS_Store
+
+# YOLO TensorRT build artifacts (GPU/TensorRT specific, build per machine with perception_ws/yolo26/build_trt_engine.py)
+*.engine
+*.engine.layers.json
+*.onnx
