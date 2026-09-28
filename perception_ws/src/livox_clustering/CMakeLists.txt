@@ -6,11 +6,11 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   sensor_msgs
   geometry_msgs
+  horizon_ground
 )
-catkin_python_setup()
 
 catkin_package(
-  CATKIN_DEPENDS rospy std_msgs sensor_msgs geometry_msgs
+  CATKIN_DEPENDS rospy std_msgs sensor_msgs geometry_msgs horizon_ground
 )
 
 catkin_install_python(PROGRAMS

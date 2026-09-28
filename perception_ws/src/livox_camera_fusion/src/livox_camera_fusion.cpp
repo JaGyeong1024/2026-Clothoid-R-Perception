@@ -1,61 +1,122 @@
 // livox_camera_fusion.cpp
 #include "livox_camera_fusion.h"
-#include "horizon_ground.h"
+#include <horizon_ground/horizon_ground.h>
 
 #include <sensor_msgs/CompressedImage.h>
 #include <sensor_msgs/PointCloud.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <pcl_conversions/pcl_conversions.h>
-#include <pcl/segmentation/extract_clusters.h>
-#include <pcl/search/kdtree.h>
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <cstdint>
 #include <limits>
-#include <set>
+#include <numeric>
+#include <unordered_map>
 
-/* ===== KalmanTracker Implementation ===== */
-KalmanTracker::KalmanTracker(const cv::Point2f &pt, int tracker_id, float dt)
-    : id(tracker_id)
+namespace
 {
-    kf.init(4, 2, 0);
-    kf.transitionMatrix = (cv::Mat_<float>(4, 4) << 1, 0, dt, 0,
-                           0, 1, 0, dt,
-                           0, 0, 1, 0,
-                           0, 0, 0, 1);
-    kf.measurementMatrix = cv::Mat::eye(2, 4, CV_32F);
-    setIdentity(kf.processNoiseCov, cv::Scalar::all(5e-2));
-    setIdentity(kf.measurementNoiseCov, cv::Scalar::all(1e-1));
-    setIdentity(kf.errorCovPost, cv::Scalar::all(1));
-    kf.statePost = (cv::Mat_<float>(4, 1) << pt.x, pt.y, 0, 0);
-    last_pos = pt;
+// JPEG SOF 마커에서 크기만 읽는다 (디코딩 없이). JPEG 가 아니거나 못 찾으면 false.
+bool jpeg_size(const std::vector<uint8_t> &d, int &width, int &height)
+{
+    if (d.size() < 4 || d[0] != 0xFF || d[1] != 0xD8)
+        return false;
+    size_t i = 2;
+    while (i + 9 < d.size())
+    {
+        if (d[i] != 0xFF)
+            return false;
+        const uint8_t m = d[i + 1];
+        if (m == 0xFF) { ++i; continue; }                             // 채움 바이트
+        if (m == 0x01 || (m >= 0xD0 && m <= 0xD7)) { i += 2; continue; }  // 길이 없는 마커
+        if (m >= 0xC0 && m <= 0xCF && m != 0xC4 && m != 0xC8 && m != 0xCC)  // SOFn
+        {
+            height = (d[i + 5] << 8) | d[i + 6];
+            width  = (d[i + 7] << 8) | d[i + 8];
+            return width > 0 && height > 0;
+        }
+        i += 2 + ((d[i + 2] << 8) | d[i + 3]);
+    }
+    return false;
 }
 
-cv::Point2f KalmanTracker::predict()
+// 거리 tol 이내 점끼리 이은 연결 성분 — PCL EuclideanClusterExtraction 과 같은 결과.
+// 한 변이 tol 인 격자에 점을 넣고 이웃 27칸의 점 쌍만 비교하며, 이미 같은 성분이면 거리 계산을 건너뛴다.
+// 각 성분의 점 번호는 오름차순 (PCL 과 같은 합산 순서).
+std::vector<std::vector<int>> euclidean_clusters(const pcl::PointCloud<pcl::PointXYZ> &cloud,
+                                                 double tol, int min_size)
 {
-    cv::Mat pr = kf.predict();
-    last_pos = {pr.at<float>(0), pr.at<float>(1)};
-    return last_pos;
-}
+    const auto &P = cloud.points;
+    const int n = static_cast<int>(P.size());
+    const float tol2 = static_cast<float>(tol * tol);   // PCL(FLANN)처럼 float 제곱 거리로 비교
+    auto key = [](int x, int y, int z) {
+        return (static_cast<int64_t>(x + (1 << 20)) << 42) |
+               (static_cast<int64_t>(y + (1 << 20)) << 21) | static_cast<int64_t>(z + (1 << 20));
+    };
+    std::vector<std::array<int, 3>> cell(n);
+    std::unordered_map<int64_t, std::vector<int>> grid;
+    for (int i = 0; i < n; ++i)
+    {
+        cell[i] = {static_cast<int>(std::floor(P[i].x / tol)),
+                   static_cast<int>(std::floor(P[i].y / tol)),
+                   static_cast<int>(std::floor(P[i].z / tol))};
+        grid[key(cell[i][0], cell[i][1], cell[i][2])].push_back(i);
+    }
 
-void KalmanTracker::update(const cv::Point2f &pt)
-{
-    cv::Mat m(2, 1, CV_32F);
-    m.at<float>(0) = pt.x;
-    m.at<float>(1) = pt.y;
-    kf.correct(m);
-    last_pos = pt;
-    miss_count = 0;
-}
+    std::vector<int> parent(n);
+    std::iota(parent.begin(), parent.end(), 0);
+    auto root = [&parent](int i) {
+        while (parent[i] != i)
+            i = parent[i] = parent[parent[i]];
+        return i;
+    };
+    for (const auto &kv : grid)
+    {
+        const std::vector<int> &A = kv.second;
+        const auto &c = cell[A[0]];
+        for (int dx = -1; dx <= 1; ++dx)
+            for (int dy = -1; dy <= 1; ++dy)
+                for (int dz = -1; dz <= 1; ++dz)
+                {
+                    const auto it = grid.find(key(c[0] + dx, c[1] + dy, c[2] + dz));
+                    if (it == grid.end())
+                        continue;
+                    const std::vector<int> &B = it->second;
+                    if (B[0] < A[0])
+                        continue;   // 칸 쌍마다 한 번
+                    const bool same = (&A == &B);
+                    for (size_t a = 0; a < A.size(); ++a)
+                        for (size_t b = same ? a + 1 : 0; b < B.size(); ++b)
+                        {
+                            const int ri = root(A[a]), rj = root(B[b]);
+                            if (ri == rj)
+                                continue;
+                            const auto &p = P[A[a]], &q = P[B[b]];
+                            const float ex = p.x - q.x, ey = p.y - q.y, ez = p.z - q.z;
+                            if (ex * ex + ey * ey + ez * ez <= tol2)
+                                parent[std::max(ri, rj)] = std::min(ri, rj);
+                        }
+                }
+    }
 
-void KalmanTracker::miss()
-{
-    predict();
-    ++miss_count;
+    std::vector<int> id(n, -1);
+    std::vector<std::vector<int>> clusters;
+    for (int i = 0; i < n; ++i)
+    {
+        const int r = root(i);
+        if (id[r] < 0)
+        {
+            id[r] = static_cast<int>(clusters.size());
+            clusters.emplace_back();
+        }
+        clusters[id[r]].push_back(i);
+    }
+    clusters.erase(std::remove_if(clusters.begin(), clusters.end(),
+                                  [min_size](const std::vector<int> &c) { return static_cast<int>(c.size()) < min_size; }),
+                   clusters.end());
+    return clusters;
 }
-
-/* ===== global trackers ===== */
-static std::map<int, KalmanTracker> trackers;
-static int next_tracker_id = 0;
+}  // namespace
 
 /* ===== LivoxCameraFusion ctor / dtor ===== */
 LivoxCameraFusion::LivoxCameraFusion(ros::NodeHandle *nodeHandle)
@@ -98,7 +159,18 @@ void LivoxCameraFusion::detectionCallback(
     const sensor_msgs::CompressedImage::ConstPtr &cam_msg,
     const detect_msgs::Yolo_Objects::ConstPtr &yolo_msg)
 {
-    camera_image = cv_bridge::toCvCopy(cam_msg, "bgr8")->image;
+    // 이미지는 bbox 를 화면 안으로 자르는 데 크기만 쓴다 → JPEG 헤더만 읽고, 아니면 디코딩
+    if (!jpeg_size(cam_msg->data, image_width, image_height))
+    {
+        const cv::Mat img = cv::imdecode(cam_msg->data, cv::IMREAD_UNCHANGED);
+        if (img.empty())
+        {
+            ROS_WARN_THROTTLE(5.0, "[livox_camera_fusion] camera image decode failed (format=%s)", cam_msg->format.c_str());
+            return;
+        }
+        image_width  = img.cols;
+        image_height = img.rows;
+    }
 
     pcl::PointCloud<pcl::PointXYZI>::Ptr pc(new pcl::PointCloud<pcl::PointXYZI>());
     pcl::fromROSMsg(*lidar_msg, *pc);
@@ -187,13 +259,10 @@ void LivoxCameraFusion::convert_msg(
             continue;
         cur_centroids.push_back(centroid);
 
-        draw_bbox_debug(box);
         *out_cloud += *local;
     }
 
-    prev_centroids = cur_centroids;
-    track_and_visualize(prev_centroids);
-    publish_2D_pointcloud(prev_centroids, header);
+    publish_2D_pointcloud(cur_centroids, header);
 
     if (!out_cloud->empty())
     {
@@ -214,9 +283,8 @@ bool LivoxCameraFusion::build_scaled_bbox(const detect_msgs::Objects &obj, Image
 
     box.x1 = std::max(0.0, cx - hw);
     box.y1 = std::max(0.0, cy - hh);
-    box.x2 = std::min<double>(camera_image.cols - 1, cx + hw);
-    box.y2 = std::min<double>(camera_image.rows - 1, cy + hh);
-    box.center = cv::Point2d(cx, cy);
+    box.x2 = std::min<double>(image_width - 1, cx + hw);
+    box.y2 = std::min<double>(image_height - 1, cy + hh);
 
     return (box.x2 - box.x1) >= MIN_BBOX_EDGE_PX &&
            (box.y2 - box.y1) >= MIN_BBOX_EDGE_PX;
@@ -286,15 +354,7 @@ bool LivoxCameraFusion::select_cluster_centroid(
     cv::Point2d &centroid,
     cv::Vec3d &extent) const
 {
-    pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>);
-    std::vector<pcl::PointIndices> clusters;
-    pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
-    ec.setClusterTolerance(CLUSTER_TOLERANCE);
-    ec.setMinClusterSize(CLUSTER_MIN_SIZE);
-    ec.setMaxClusterSize(std::numeric_limits<int>::max());
-    ec.setSearchMethod(tree);
-    ec.setInputCloud(cloud);
-    ec.extract(clusters);
+    const std::vector<std::vector<int>> clusters = euclidean_clusters(*cloud, CLUSTER_TOLERANCE, CLUSTER_MIN_SIZE);
 
     bool found = false;
     double best_x = std::numeric_limits<double>::infinity();
@@ -307,7 +367,7 @@ bool LivoxCameraFusion::select_cluster_centroid(
         double xmax = -std::numeric_limits<double>::infinity();
         double ymax = -std::numeric_limits<double>::infinity();
         double zmax = -std::numeric_limits<double>::infinity();
-        for (int idx : cl.indices)
+        for (int idx : cl)
         {
             const auto &p = cloud->points[idx];
             sx += p.x; sy += p.y;
@@ -321,90 +381,15 @@ bool LivoxCameraFusion::select_cluster_centroid(
         if (width  < CLUSTER_MIN_WIDTH  || width  > CLUSTER_MAX_WIDTH)  continue;
         if (height < CLUSTER_MIN_HEIGHT || height > CLUSTER_MAX_HEIGHT) continue;
 
-        const double mx = sx / cl.indices.size();
+        const double mx = sx / cl.size();
         if (mx >= best_x) continue;
         best_x   = mx;
-        centroid = cv::Point2d(mx, sy / cl.indices.size());
+        centroid = cv::Point2d(mx, sy / cl.size());
         extent   = cv::Vec3d(length, width, height);
         found    = true;
     }
     return found;
 }
-
-void LivoxCameraFusion::draw_bbox_debug(const ImageBox &box)
-{
-    cv::rectangle(camera_image,
-                  {int(box.x1), int(box.y1)},
-                  {int(box.x2), int(box.y2)},
-                  {0, 255, 0}, 2);
-    cv::circle(camera_image, box.center, 4, {0, 0, 255}, 2);
-}
-
-/* ===== track matching ===== */
-void LivoxCameraFusion::match_and_update_trackers(
-    const std::vector<cv::Point2f> &cents,
-    double match_dist, int max_miss)
-{
-    std::set<int> matched_t, matched_o;
-    std::vector<cv::Point2f> preds;
-    std::vector<int> keys;
-    for (auto &kv : trackers)
-    {
-        preds.push_back(kv.second.predict());
-        keys.push_back(kv.first);
-    }
-    if (!cents.empty() && !preds.empty())
-    {
-        cv::Mat D((int)cents.size(), (int)preds.size(), CV_32F);
-        for (int i = 0; i < (int)cents.size(); ++i)
-            for (int j = 0; j < (int)preds.size(); ++j)
-                D.at<float>(i, j) = cv::norm(cents[i] - preds[j]);
-        while (true)
-        {
-            double vmin;
-            cv::Point loc;
-            cv::minMaxLoc(D, &vmin, nullptr, &loc, nullptr);
-            if (vmin > match_dist)
-                break;
-            int oi = loc.y, tj = loc.x;
-            trackers[keys[tj]].update(cents[oi]);
-            matched_t.insert(keys[tj]);
-            matched_o.insert(oi);
-            D.row(oi).setTo(1e9);
-            D.col(tj).setTo(1e9);
-        }
-    }
-    for (auto &kv : trackers)
-        if (!matched_t.count(kv.first))
-            kv.second.miss();
-    std::vector<int> del;
-    for (auto &kv : trackers)
-        if (kv.second.miss_count > max_miss)
-            del.push_back(kv.first);
-    for (int k : del)
-        trackers.erase(k);
-    for (size_t i = 0; i < cents.size(); ++i)
-        if (!matched_o.count(i))
-            trackers[next_tracker_id] = KalmanTracker(cents[i], next_tracker_id++);
-}
-
-void LivoxCameraFusion::track_and_visualize(const std::vector<cv::Point2d> &cents)
-{
-    std::vector<cv::Point2f> c2f;
-    for (const auto &c : cents)
-        c2f.emplace_back((float)c.x, (float)c.y);
-
-    match_and_update_trackers(c2f, MATCH_DIST, TRACKER_MAX_MISS);
-
-    for (const auto &kv : trackers)
-    {
-        cv::circle(camera_image, kv.second.last_pos, 6, {255, 0, 255}, 2);
-        cv::putText(camera_image, std::to_string(kv.first),
-                    kv.second.last_pos + cv::Point2f(5, -5),
-                    cv::FONT_HERSHEY_SIMPLEX, 0.5, {255, 255, 0}, 1);
-    }
-}
-
 
 /* ===== publish 2D PointCloud ===== */
 void LivoxCameraFusion::publish_2D_pointcloud(

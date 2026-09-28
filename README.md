@@ -66,6 +66,7 @@ Clothoid-R 자율주행 시스템의 Perception ROS workspace.
 | `yolo26` | Camera YOLO26 detection |
 | `livox_clustering` | Livox point cloud clustering and tracking |
 | `livox_camera_fusion` | Livox-camera YOLO fusion |
+| `horizon_ground` | Livox Horizon ground removal shared by `livox_camera_fusion` (C++) and `livox_clustering` (Python via ctypes) |
 | `velodyne_detection` | Velodyne BEV YOLO detection with OC-SORT tracking |
 
 `system_ws/src`:

@@ -15,7 +15,7 @@ from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import connected_components
 import std_msgs.msg
 
-from livox_clustering import horizon_ground
+from horizon_ground import non_ground
 
 # ---- 기본 파라미터 (yaml / rosparam 으로 덮어씀) ----
 ROI_X_MIN, ROI_X_MAX = 0, 8
@@ -185,9 +185,7 @@ class LivoxEuclideanClustering:
         """지면 제거 → 발행 ROI → voxel → DROR. 반환: 물체 후보 점, 지면 평면"""
         g = pts[(pts[:, 0] >= 0) & (pts[:, 0] <= GROUND_X_MAX) &
                 (np.abs(pts[:, 1]) <= GROUND_Y_ABS) & (np.abs(pts[:, 2]) <= GROUND_Z_ABS)]
-        if len(g) == 0:
-            return g, (0.0, 0.0, horizon_ground.ZREF)
-        ng, ground = horizon_ground.non_ground(g)
+        ng, ground = non_ground(g)
         q = g[ng]
         q = q[(ROI_X_MIN <= q[:, 0]) & (q[:, 0] <= ROI_X_MAX) &
               (ROI_Y_MIN <= q[:, 1]) & (q[:, 1] <= ROI_Y_MAX) & (q[:, 2] <= ROI_Z_MAX)]

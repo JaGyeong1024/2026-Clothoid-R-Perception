@@ -1,4 +1,4 @@
-#include "horizon_ground.h"
+#include "horizon_ground/horizon_ground.h"
 
 #include <Eigen/Dense>
 #include <algorithm>
@@ -18,8 +18,6 @@ constexpr double ZREF = -0.72;                                 // 평지 기준 
 constexpr double TH_SEED = 0.125, TH_DIST = 0.125, FLAT = 0.003, TH = 0.2;
 const double UPRIGHT = std::cos(8.0 * M_PI / 180.0);
 constexpr size_t NMIN = 15;
-
-struct Plane { double a, b, c; };  // z = a x + b y + c
 
 double percentile(std::vector<double> v, double q)
 {
@@ -165,7 +163,7 @@ std::vector<char> pass(const std::vector<cv::Point3d> &p, const Plane &prior, do
 }
 }  // namespace
 
-std::vector<char> nonGround(const std::vector<cv::Point3d> &pts)
+std::vector<char> nonGround(const std::vector<cv::Point3d> &pts, Plane *ground)
 {
     std::vector<cv::Point3d> seeds;
     pass(pts, {0, 0, ZREF}, 0.3, &seeds);
@@ -182,6 +180,17 @@ std::vector<char> nonGround(const std::vector<cv::Point3d> &pts)
         if (std::fabs(x[0]) <= 0.1 && std::fabs(x[1]) <= 0.1 && std::fabs(x[2] - ZREF) <= 0.25)
             prior = {x[0], x[1], x[2]};
     }
+    if (ground) *ground = prior;
     return pass(pts, prior, 0.15, nullptr);
 }
 }  // namespace horizon_ground
+
+extern "C" void horizon_ground_non_ground(const double *xyz, int n, unsigned char *mask, double *plane)
+{
+    std::vector<cv::Point3d> pts(n);
+    for (int i = 0; i < n; ++i) pts[i] = cv::Point3d(xyz[3 * i], xyz[3 * i + 1], xyz[3 * i + 2]);
+    horizon_ground::Plane g;
+    const std::vector<char> ng = horizon_ground::nonGround(pts, &g);
+    for (int i = 0; i < n; ++i) mask[i] = ng[i];
+    plane[0] = g.a; plane[1] = g.b; plane[2] = g.c;
+}

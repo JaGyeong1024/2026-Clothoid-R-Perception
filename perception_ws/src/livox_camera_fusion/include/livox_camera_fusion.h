@@ -7,11 +7,8 @@
 #include <ros/ros.h>
 
 #include <opencv2/opencv.hpp>
-#include <cv_bridge/cv_bridge.h>
 
 #include <pcl_ros/point_cloud.h>
-#include <pcl/segmentation/extract_clusters.h>
-#include <pcl/search/kdtree.h>
 #include <pcl/filters/voxel_grid.h>
 #include <pcl_conversions/pcl_conversions.h>
 
@@ -28,7 +25,6 @@
 
 #include <memory>
 #include <vector>
-#include <map>
 
 /* ===== Parameters ===== */
 static constexpr double BBOX_SCALE_RATIO = 1.0;
@@ -38,8 +34,6 @@ static constexpr int CLUSTER_MIN_SIZE = 10;    // bbox 전체를 쓰므로 노�
  * 대신 bbox 점이 많으면 복셀로 솎아 클러스터링 연산을 묶는다. 쓰레기 클러스터는 아래 크기 게이트가 거른다. */
 static constexpr int    BBOX_VOXEL_MIN_POINTS = 1000;
 static constexpr double BBOX_VOXEL_LEAF       = 0.05;
-static constexpr double MATCH_DIST = 0.7;  // 20km/h, 10Hz 기준 프레임당 ego 이동 ~0.56m + 여유
-static constexpr int TRACKER_MAX_MISS = 10;
 static constexpr int MIN_BBOX_EDGE_PX = 0;
 
 /* ===== Livox 마운트 pitch ===== */
@@ -69,21 +63,6 @@ static constexpr double CLUSTER_MAX_WIDTH  = 3.0;
 static constexpr double CLUSTER_MIN_HEIGHT = 0.2;
 static constexpr double CLUSTER_MAX_HEIGHT = 2.0;
 
-/* ===== Kalman Tracker ===== */
-struct KalmanTracker
-{
-    int id{-1};
-    int miss_count{0};
-    cv::KalmanFilter kf;
-    cv::Point2f last_pos;
-
-    KalmanTracker() = default;
-    KalmanTracker(const cv::Point2f &pt, int tracker_id, float dt = 0.1f);
-    cv::Point2f predict();
-    void update(const cv::Point2f &pt);
-    void miss();
-};
-
 /* ===== LivoxCameraFusion ===== */
 class LivoxCameraFusion
 {
@@ -99,7 +78,6 @@ private:
         double y1{0};
         double x2{0};
         double y2{0};
-        cv::Point2d center;
     };
 
     ros::NodeHandle nh;
@@ -116,10 +94,9 @@ private:
     std::string centroid_topic, filtered_cloud_topic, preprocessed_topic, frame_name;
 
     cv::Mat projection_matrix;
-    cv::Mat camera_image;
+    int image_width{0}, image_height{0};   // 카메라 이미지 크기 (bbox 자르기용)
     std::vector<cv::Point3d> lidar_points;
     std::vector<cv::Point2d> projected_list;
-    std::vector<cv::Point2d> prev_centroids;
 
     void read_projection_matrix();
     void detectionCallback(const sensor_msgs::PointCloud2::ConstPtr &lidar_msg,
@@ -137,13 +114,8 @@ private:
     bool select_cluster_centroid(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud,
                                  cv::Point2d &centroid,
                                  cv::Vec3d &extent) const;
-    void draw_bbox_debug(const ImageBox &box);
     void publish_2D_pointcloud(const std::vector<cv::Point2d> &pts,
                                const std_msgs::Header &header);
-    void track_and_visualize(const std::vector<cv::Point2d> &cents);
-    void match_and_update_trackers(const std::vector<cv::Point2f> &cents,
-                                   double match_dist = MATCH_DIST,
-                                   int max_miss = TRACKER_MAX_MISS);
 
 public:
     explicit LivoxCameraFusion(ros::NodeHandle *nh);

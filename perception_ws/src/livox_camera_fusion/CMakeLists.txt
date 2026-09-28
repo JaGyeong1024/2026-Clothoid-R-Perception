@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 3.0.2)
 project(livox_camera_fusion)
 
 add_compile_options(-std=c++14)
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
 
 find_package(catkin REQUIRED COMPONENTS
   roscpp
@@ -9,12 +12,12 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   sensor_msgs
   geometry_msgs
-  cv_bridge
   pcl_ros
   pcl_conversions
   message_filters
   detect_msgs
   dynamic_reconfigure
+  horizon_ground
 )
 
 find_package(OpenCV REQUIRED)
@@ -27,8 +30,8 @@ generate_dynamic_reconfigure_options(
 catkin_package(
   CATKIN_DEPENDS
     roscpp rospy std_msgs sensor_msgs geometry_msgs
-    cv_bridge pcl_ros pcl_conversions message_filters
-    detect_msgs dynamic_reconfigure
+    pcl_ros pcl_conversions message_filters
+    detect_msgs dynamic_reconfigure horizon_ground
 )
 
 include_directories(
@@ -41,7 +44,6 @@ include_directories(
 add_executable(${PROJECT_NAME}_node
   src/main.cpp
   src/livox_camera_fusion.cpp
-  src/horizon_ground.cpp
 )
 
 add_dependencies(${PROJECT_NAME}_node

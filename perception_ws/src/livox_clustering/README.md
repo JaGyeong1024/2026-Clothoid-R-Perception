@@ -33,7 +33,7 @@ Livox LiDAR 단독 물체 검출 노드 (Python): 지면 제거 + XY 클러스�
 
 ```
 PointCloud2 read
-  → 지면 제거 (horizon_ground: x ≤ 15 m, |y| ≤ 7 m 에서 칸별 지면 평면 추정, 퓨전 노드와 같은 알고리즘)
+  → 지면 제거 (`horizon_ground` 패키지, 퓨전 노드와 같은 구현: x ≤ 15 m, |y| ≤ 7 m 에서 칸별 지면 평면 추정)
   → 발행 ROI 컷 (x 0~8 m, |y| ≤ 3 m)
   → voxel downsample
   → DROR (Dynamic Radius Outlier Removal)

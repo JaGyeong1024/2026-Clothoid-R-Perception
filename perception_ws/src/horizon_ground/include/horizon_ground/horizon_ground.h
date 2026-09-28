@@ -6,8 +6,13 @@
 
 namespace horizon_ground
 {
+struct Plane { double a, b, c; };  // z = a x + b y + c
+
 /* 시야(±41°) 안 극좌표 칸마다 최저점 씨앗 + PCA 평면, 직립도·높이·평탄도 검사, 실패 칸은 이웃 칸으로 대체.
  * 전역 사전 평면은 1차 통과 칸들의 씨앗으로 다시 맞추고(2단), 평면은 인라이어 하위 25%에 맞춘다.
- * 반환: 점마다 비지면(1) / 지면(0). */
-std::vector<char> nonGround(const std::vector<cv::Point3d> &pts);
+ * 반환: 점마다 비지면(1) / 지면(0). ground 가 있으면 전역 지면 평면을 채운다. */
+std::vector<char> nonGround(const std::vector<cv::Point3d> &pts, Plane *ground = nullptr);
 }  // namespace horizon_ground
+
+// 파이썬(ctypes)용. xyz: n×3 행 우선, mask: n 바이트(비지면 1), plane: a, b, c
+extern "C" void horizon_ground_non_ground(const double *xyz, int n, unsigned char *mask, double *plane);

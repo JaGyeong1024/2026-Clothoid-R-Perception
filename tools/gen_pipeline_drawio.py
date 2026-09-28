@@ -70,7 +70,7 @@ LPX = 1220                                      # local_path 노드 x
 
 # 프레임 / 제목
 cell("", "rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#999999;", 0, 0, 1440, 940)
-cell("2026 Clothoid-R Perception pipeline  ·  updated 2026-09-17",
+cell("2026 Clothoid-R Perception pipeline  ·  updated 2026-09-28",
      "text;html=1;align=left;verticalAlign=middle;fontSize=11;fontColor=#666666;strokeColor=none;fillColor=none;", 20, 8, 500, 20)
 
 # 워크스페이스 컨테이너
@@ -112,7 +112,7 @@ pkg("velodyne_detection", "#d5e8d4", (n_vb, vb_h))
 
 cl_h = 30 + 40 + 15 * 6 + 16
 n_cl = node("livox_euclidean_clustering", "Euclidean clustering on Livox cloud",
-            ["pitch calib / ROI", "voxel + DROR", "ground removal (grid + RANSAC)", "euclidean clustering + size gate", "KF tracking (min_hits gate)"], PX, R2 - cl_h // 2)[0]
+            ["ground removal (horizon_ground)", "ROI + voxel + DROR", "XY clustering (0.15 m)", "height / footprint gate", "KF tracking (min_hits gate)"], PX, R2 - cl_h // 2)[0]
 pkg("livox_clustering", "#e1d5e7", (n_cl, cl_h))
 
 yo_h = 30 + 40 + 15 * 5 + 16
@@ -125,7 +125,7 @@ fu_h = 30 + 40 + 15 * 6 + 16
 LIV_FUS_Y = 600
 fu_y = LIV_FUS_Y - fu_h // 4
 n_fu = node("livox_camera_fusion_node", "Livox-camera YOLO fusion",
-            ["ApproxTime sync", "LiDAR → camera projection", "ground removal (grid + RANSAC)", "YOLO bbox ROI clustering", "3D size gate + KF tracking"], FX, fu_y)[0]
+            ["ApproxTime sync", "LiDAR → camera projection", "ground removal (horizon_ground)", "YOLO bbox ROI clustering", "3D size gate + nearest cluster"], FX, fu_y)[0]
 pkg("livox_camera_fusion", "#fff2cc", (n_fu, fu_h), x=FX)
 fu_in = [fu_y + fu_h * k for k in (0.25, 0.5, 0.75)]
 

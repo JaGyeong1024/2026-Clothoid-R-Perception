@@ -9,7 +9,7 @@ Livox LiDAR + 카메라 YOLO 결과를 시간 동기화하여 객체의 중점 �
 | 토픽 | 메시지 | 비고 |
 |---|---|---|
 | `/livox/lidar` | `sensor_msgs/PointCloud2` | Livox 포인트클라우드 |
-| `/camera/image_raw/compressed` | `sensor_msgs/CompressedImage` | 카메라 RGB |
+| `/camera/image_raw/compressed` | `sensor_msgs/CompressedImage` | 카메라 이미지 (동기화용, 헤더에서 크기만 읽음) |
 | `/perception/camera/yolo` | `detect_msgs/Yolo_Objects` | yolo26 노드의 bbox 결과 |
 
 세 토픽은 `message_filters::ApproximateTime`(slop 50ms)으로 동기화.
@@ -40,8 +40,8 @@ Livox LiDAR + 카메라 YOLO 결과를 시간 동기화하여 객체의 중점 �
 LiDAR + Camera + YOLO 동기화 (ApproximateTime, 최대 간격 50 ms)
   → projection_matrix로 LiDAR → 카메라 픽셀 좌표 투영
   → 3D ROI (x 0~15 m, |y| ≤ 7 m, |z| ≤ 2 m)
-  → 전체 클라우드 지면 제거 (horizon_ground: Livox Horizon 시야 안 칸별 지면 평면)
+  → 전체 클라우드 지면 제거 (`horizon_ground` 패키지: Livox Horizon 시야 안 칸별 지면 평면)
   → 각 YOLO bbox 안의 LiDAR 포인트 추출 (1000점 초과면 5 cm 복셀로 솎음)
-  → Euclidean clustering (점 수 상한 없음) → 크기 게이트 통과 클러스터 중 최근접의 (x, y) 중심
+  → Euclidean clustering (0.4 m 연결 성분, 격자로 이웃 칸만 비교, 점 수 상한 없음) → 크기 게이트 통과 클러스터 중 최근접의 (x, y) 중심
   → /perception/fusion/centroids 발행 (YOLO 박스가 없거나 못 찾으면 빈 목록)
 ```

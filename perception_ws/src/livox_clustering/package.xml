@@ -13,4 +13,5 @@
   <depend>std_msgs</depend>
   <depend>sensor_msgs</depend>
   <depend>geometry_msgs</depend>
+  <depend>horizon_ground</depend>
 </package>
