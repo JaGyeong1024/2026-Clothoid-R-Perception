@@ -20,6 +20,9 @@ install/
 log/
 .catkin_tools/
 .catkin_workspace
+# toplevel.cmake symlinks created by catkin_make
+/perception_ws/src/CMakeLists.txt
+/system_ws/src/CMakeLists.txt
 *.bag
 *.bag.active
 
