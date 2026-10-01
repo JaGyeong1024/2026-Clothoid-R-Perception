@@ -6,8 +6,15 @@
 #   ./tools/record_and_measure.sh --all        # 전체 토픽(-a)
 #   ./tools/record_and_measure.sh --no-bag     # 계측만
 #   ./tools/record_and_measure.sh --out DIR --period 0.5
+#   ./tools/record_and_measure.sh --post 0      # 종료 뒤 추가 계측 안 함 (기본 60초)
+#
+# Ctrl+C 한 번: bag 을 닫고, 계측·카메라 감시는 --post 초 더 기록한 뒤 끝낸다
+#   (녹화를 끄며 카메라를 껐다 켤 때의 상태까지 남기려고). 한 번 더 누르면 바로 끝낸다.
 #
 # 결과는 <레포>/runs/<날짜_시각>/ 에 남는다 (*.bag 은 .gitignore 로 추적 제외).
+# meta/ 에는 bag 에 없는 하드웨어 기록도 남긴다: USB 포트 구성(시작·종료), 부팅 이력,
+# 녹화 구간 커널 로그(USB·카메라 오류), 노드 시작·종료 기록, 카메라 발행 0 Hz 구간.
+# 녹화 중 카메라 발행이 끊기면 바로 경고하고 meta/events.txt 에 시각을 남긴다 (그 순간 박스 LED 확인용).
 set -u
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -46,6 +53,7 @@ RECORD_ALL=0
 DO_BAG=1
 DO_MON=1
 PERIOD=1
+POST=60
 OUT=""
 
 while [ $# -gt 0 ]; do
@@ -55,7 +63,8 @@ while [ $# -gt 0 ]; do
     --no-monitor) DO_MON=0 ;;
     --out)        OUT="$2"; shift ;;
     --period)     PERIOD="$2"; shift ;;
-    -h|--help)    sed -n '2,12p' "$0"; exit 0 ;;
+    --post)       POST="$2"; shift ;;
+    -h|--help)    sed -n '2,17p' "$0"; exit 0 ;;
     *) echo "알 수 없는 옵션: $1" >&2; exit 2 ;;
   esac
   shift
@@ -101,8 +110,13 @@ for r in "$REPO" "$HOME/clothoid-r"; do
     git -C "$r" status --short
   } >> "$META/git.txt" 2>&1
 done
-{ ip -br addr; echo; lsusb; echo; nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv; } \
+{ ip -br addr; echo; lsusb; echo; lsusb -t; echo; nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv; } \
   > "$META/hardware.txt" 2>&1
+# ERP 전원 차단은 nuvo 전원도 끊어 재부팅으로 남는다. 직전 부팅이 언제 어떻게 끝났는지 본다.
+journalctl --list-boots --no-pager 2>/dev/null | tail -5 > "$META/boots.txt"
+# 전원이 끊기면 종료 처리(커널 로그 저장)가 돌지 못한다 → 다음 녹화 시작 때 직전 부팅의 마지막 기록을 남긴다.
+# 정상 종료면 끝에 종료 절차 메시지가 있고, 전원 차단이면 그런 메시지 없이 끊긴다.
+journalctl -b -1 -n 300 --no-pager -o short-precise > "$META/prev_boot_tail.log" 2>&1
 echo "메타데이터: $META (rosparam, 노드/토픽 목록, git HEAD, 하드웨어)"
 
 # --- 사전 점검: 같은 토픽에 발행자가 둘 이상이면 수치가 부풀어 데이터를 못 쓴다 ---
@@ -165,6 +179,22 @@ START=$(date +%s)
 
 SHUTTING_DOWN=0
 
+# 자식 하나가 끝날 때까지 기다린다. 20초에 TERM, 40초에 KILL 로 단계적 강제 종료.
+wait_children() {
+  local pid="$1" waited=0
+  [ -n "$pid" ] || return
+  while kill -0 "$pid" 2>/dev/null && [ "$waited" -lt 120 ]; do
+    if [ "$waited" = 40 ]; then
+      echo "  응답이 없어 SIGTERM 을 보냅니다 (pid $pid)"; kill -TERM "$pid" 2>/dev/null
+    fi
+    if [ "$waited" = 80 ]; then
+      echo "  강제 종료합니다 (pid $pid, bag 이면 손상될 수 있습니다)"; kill -9 "$pid" 2>/dev/null
+    fi
+    waited=$((waited + 1))
+    sleep 0.5
+  done
+}
+
 finish() {
   SHUTTING_DOWN=1
   trap '' INT TERM
@@ -173,28 +203,43 @@ finish() {
   # rosbag 은 SIGINT 를 받아야 .bag.active 를 정상 .bag 으로 닫는다.
   # SIGINT 는 각 자식에게 정확히 한 번만. 두 번 보내면 요약을 쓰다 끊긴다.
   [ -n "$BAG_PID" ] && kill -INT "$BAG_PID" 2>/dev/null
+  wait_children "$BAG_PID"
+
+  # bag 을 끈 뒤에도 계측·카메라 감시는 잠시 더 (녹화 종료 때 카메라를 껐다 켜는 순간까지 남긴다)
+  if [ -n "$MON_PID" ] && [ "$POST" -gt 0 ] 2>/dev/null; then
+    echo "bag 저장 완료. 계측·카메라 감시를 ${POST}초 더 기록합니다 (바로 끝내려면 Ctrl+C)"
+    POST_ABORT=0
+    trap 'POST_ABORT=1' INT TERM
+    local t=0
+    while [ "$t" -lt "$POST" ] && [ "$POST_ABORT" = 0 ] && kill -0 "$MON_PID" 2>/dev/null; do
+      check_camera
+      sleep 1; t=$((t + 1))
+    done
+    trap '' INT TERM
+  fi
   [ -n "$MON_PID" ] && kill -INT "$MON_PID" 2>/dev/null
-  local waited=0
-  while [ "$waited" -lt 120 ]; do
-    local alive=0
-    [ -n "$BAG_PID" ] && kill -0 "$BAG_PID" 2>/dev/null && alive=1
-    [ -n "$MON_PID" ] && kill -0 "$MON_PID" 2>/dev/null && alive=1
-    [ "$alive" = 0 ] && break
-    # 20초가 지나도 안 죽으면 TERM, 40초면 KILL 로 단계적 강제 종료
-    if [ "$waited" = 40 ]; then
-      echo "  응답이 없어 SIGTERM 을 보냅니다"
-      [ -n "$BAG_PID" ] && kill -TERM "$BAG_PID" 2>/dev/null
-      [ -n "$MON_PID" ] && kill -TERM "$MON_PID" 2>/dev/null
-    fi
-    if [ "$waited" = 80 ]; then
-      echo "  강제 종료합니다 (bag 이 손상될 수 있습니다)"
-      [ -n "$BAG_PID" ] && kill -9 "$BAG_PID" 2>/dev/null
-      [ -n "$MON_PID" ] && kill -9 "$MON_PID" 2>/dev/null
-    fi
-    waited=$((waited + 1))
-    sleep 0.5
-  done
+  wait_children "$MON_PID"
   rm -f "$OUT/bag.pid" "$OUT/mon.pid"
+
+  # 하드웨어 기록: 카메라 멈춤 같은 사건은 bag 만으로는 원인을 못 가른다.
+  # 커널 로그(USB 끊김·-71·-110)는 녹화 1분 전부터, 노드 시작·종료는 이번 roscore 기동 이후 전부.
+  journalctl -k --no-pager -o short-precise --since "@$((START - 60))" > "$META/kernel.log" 2>&1
+  lsusb -t > "$META/usb_end.txt" 2>&1
+  local logdir
+  logdir=$(roslaunch-logs 2>/dev/null)
+  if [ -d "$logdir" ]; then
+    grep -hE "started with pid|killing os process|has died" "$logdir"/roslaunch-*.log \
+      | sort -k2,3 > "$META/node_events.log" 2>/dev/null
+  fi
+  # 카메라 발행이 0 Hz 로 떨어진 구간 (한 번이라도 들어온 뒤부터, 계측 경과 초)
+  local cam_gaps=""
+  if [ -f "$OUT/mon/topics.csv" ]; then
+    cam_gaps=$(awk -F, '$3=="/camera/image_raw/compressed" {
+        if ($4+0 >= 1) { seen=1; if (s!="") { printf "%s~%ss ", s, e; s="" } }
+        else if (seen) { if (s=="") s=$2; e=$2 } }
+      END { if (s!="") printf "%s~%ss(끝까지)", s, e }' "$OUT/mon/topics.csv")
+    echo "${cam_gaps:-없음}" > "$META/camera_stall.txt"
+  fi
 
   # 혹시 .active 가 남으면 알려준다 (rosbag reindex 필요)
   if ls "$OUT"/*.bag.active >/dev/null 2>&1; then
@@ -217,13 +262,41 @@ finish() {
     cat "$OUT/mon/summary.txt"
     echo "CSV : $OUT/mon/{proc,system,topics,irq}.csv"
   fi
+  if [ -n "$cam_gaps" ]; then
+    echo
+    echo "경고: 카메라 발행이 멈춘 구간이 있습니다 (계측 경과 초): $cam_gaps"
+    echo "      박스 LED 색·조치 내용을 기록해 두세요. 커널 로그: $META/kernel.log"
+  fi
   exit 0
 }
 trap finish INT TERM HUP
 
+# 녹화 중 카메라 발행이 0 Hz 로 떨어지거나 돌아오면 로그 한 줄로 알린다 (계측의 마지막 카메라 행 기준)
+CAM_SEEN=0
+CAM_STALLED=0
+CAM_STALL_SINCE=0
+check_camera() {
+  [ -f "$OUT/mon/topics.csv" ] || return
+  local row hz ts now
+  row=$(tail -n 40 "$OUT/mon/topics.csv" | grep ",/camera/image_raw/compressed," | tail -n 1)
+  [ -n "$row" ] || return
+  ts=$(echo "$row" | cut -d, -f2); hz=$(echo "$row" | cut -d, -f4)
+  now=$(date +%s)
+  if awk -v h="$hz" 'BEGIN{exit !(h+0 >= 1)}'; then
+    if [ "$CAM_STALLED" = 1 ]; then
+      echo "[$(date +%T)] 카메라 발행 복구 (계측 ${ts}s, $((now - CAM_STALL_SINCE))초 멈춤)" | tee -a "$META/events.txt"
+    fi
+    CAM_SEEN=1; CAM_STALLED=0
+  elif [ "$CAM_SEEN" = 1 ] && [ "$CAM_STALLED" = 0 ]; then
+    CAM_STALLED=1; CAM_STALL_SINCE=$now
+    echo "[$(date +%T)] 경고: 카메라 발행 멈춤 (계측 ${ts}s) — 박스 LED 색·조치를 적어 두세요" | tee -a "$META/events.txt"
+  fi
+}
+
 # 자식이 먼저 죽으면(예: 디스크 가득) 같이 정리한다
 while true; do
   [ "$SHUTTING_DOWN" = 1 ] && break
+  [ "$DO_MON" = 1 ] && check_camera
   if [ -n "$BAG_PID" ] && ! kill -0 "$BAG_PID" 2>/dev/null; then
     echo "rosbag 이 예기치 않게 종료되었습니다. bag.log 를 확인하세요."; finish
   fi
