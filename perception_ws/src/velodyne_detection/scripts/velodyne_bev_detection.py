@@ -118,6 +118,18 @@ class VelodyneBevDetection:
                               min_hits      = OCSORT_MIN_HITS,
                               delta_t       = OCSORT_DELTA_T)
 
+        # 트랙 발행 규칙
+        #   streak:    OCSort 기본. 1프레임만 놓쳐도 hit_streak 이 0 이 되어 다시 min_hits 연속까지 발행 안 함
+        #   confirmed: 한 번 min_hits 에 도달한 트랙은 confirmed_max_gap 프레임 이내로 놓쳤다가
+        #              다시 매칭되면 바로 발행. 공백이 더 길면 확정을 풀고 다시 min_hits 연속을 요구
+        self.publish_policy = rospy.get_param("~publish_policy", "confirmed")
+        if self.publish_policy not in ("streak", "confirmed"):
+            rospy.logwarn(f"[velodyne_bev_detection] unknown publish_policy={self.publish_policy}; using confirmed")
+            self.publish_policy = "confirmed"
+        self.confirmed_max_gap = int(rospy.get_param("~confirmed_max_gap", 3))
+        self.confirmed_ids = set()
+        self.last_match = {}   # 트랙 id -> 마지막으로 매칭된 tracker.frame_count
+
         self.bridge = CvBridge()
 
         # Topics
@@ -140,6 +152,8 @@ class VelodyneBevDetection:
 
         rospy.loginfo(f"[velodyne_bev_detection] subscribe={input_topic} "
                       f"-> centroids={centroid_topic}")
+        rospy.loginfo(f"[velodyne_bev_detection] publish_policy={self.publish_policy} "
+                      f"confirmed_max_gap={self.confirmed_max_gap}")
 
     def timer_cb(self, _):
         now = rospy.get_time()
@@ -176,6 +190,38 @@ class VelodyneBevDetection:
         d = (np.clip(dmap,0,self.max_pts)/self.max_pts*255).astype(np.uint8)
         return cv2.merge([d,i,h])
 
+    def track_step(self, dets):
+        """dets [M,5] -> 발행할 트랙 [K,5] (x1,y1,x2,y2,id)."""
+        tracks = self.tracker.update(dets,
+                                     (self.img_h, self.img_w),
+                                     (self.img_h, self.img_w))
+        if self.publish_policy == "streak":
+            return tracks
+
+        # OCSort.update 의 발행 루프와 같은 순서·박스 선택에 '확정 후 짧은 공백' 조건만 더한다
+        f = self.tracker.frame_count
+        out = []
+        for trk in reversed(self.tracker.trackers):
+            if trk.time_since_update >= 1:      # 이번 프레임에 매칭되지 않음
+                continue
+            gap = f - self.last_match.get(trk.id, f - 1) - 1
+            self.last_match[trk.id] = f
+            if gap > self.confirmed_max_gap:
+                self.confirmed_ids.discard(trk.id)
+            if trk.hit_streak >= OCSORT_MIN_HITS:
+                self.confirmed_ids.add(trk.id)
+            if (trk.hit_streak >= OCSORT_MIN_HITS or f <= OCSORT_MIN_HITS
+                    or trk.id in self.confirmed_ids):
+                if trk.last_observation.sum() < 0:
+                    box = trk.get_state()[0]
+                else:
+                    box = trk.last_observation[:4]
+                out.append(np.concatenate((box, [trk.id + 1])))
+        alive = {trk.id for trk in self.tracker.trackers}
+        self.confirmed_ids &= alive
+        self.last_match = {k: v for k, v in self.last_match.items() if k in alive}
+        return np.asarray(out, dtype=np.float64).reshape(-1, 5)
+
     def lidar_cb(self, msg: PointCloud2):
         self.last_input_time = rospy.get_time()
         pts = parse_xyzi_points(msg)
@@ -190,9 +236,7 @@ class VelodyneBevDetection:
         if dets.size == 0:
             dets = np.empty((0,5), np.float32)
 
-        tracks = self.tracker.update(dets,
-                                     (self.img_h, self.img_w),
-                                     (self.img_h, self.img_w))
+        tracks = self.track_step(dets)
 
         pcl_msg = PointCloud()
         pcl_msg.header.frame_id = self.frame_id

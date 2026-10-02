@@ -13,6 +13,8 @@
   <arg name="device"         default="cuda"/>
   <arg name="detect_conf"    default="0.4"/>
   <arg name="frame_id"       default="velodyne"/>
+  <arg name="publish_policy" default="confirmed"/>  <!-- confirmed | streak (OC-SORT 기본) -->
+  <arg name="confirmed_max_gap" default="3"/>
 
   <node pkg="velodyne_detection" respawn="true" respawn_delay="2"
         type="velodyne_bev_detection.py"
@@ -27,6 +29,8 @@
     <param name="device"               value="$(arg device)"/>
     <param name="detect_conf"          value="$(arg detect_conf)"/>
     <param name="frame_id"             value="$(arg frame_id)"/>
+    <param name="publish_policy"       value="$(arg publish_policy)"/>
+    <param name="confirmed_max_gap"    value="$(arg confirmed_max_gap)"/>
     <param name="voxel_size"           value="0.05"/>
     <rosparam param="x_range">[-15.0, 15.0]</rosparam>
     <rosparam param="y_range">[-15.0, 15.0]</rosparam>

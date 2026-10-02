@@ -34,6 +34,18 @@ Velodyne LiDAR 포인트클라우드를 BEV 이미지로 변환 후 YOLO + OC-SO
 | `x_range` / `y_range` / `z_range` | `[-15, 15]` / `[-15, 15]` / `[-2.5, 2]` | BEV 영역 |
 | `max_points_per_voxel` | `30` | density 채널 정규화 max |
 | `frame_id` | `velodyne` | 출력 frame_id |
+| `publish_policy` | `confirmed` | 트랙 발행 규칙. `confirmed` = 아래 표의 확정 후 재개, `streak` = OC-SORT 기본(이전 동작) |
+| `confirmed_max_gap` | `3` | `confirmed`에서 확정 트랙이 바로 다시 발행되는 최대 공백(프레임) |
+
+### 트랙 기준과 범위
+
+| 항목 | `streak` (이전) | `confirmed` (기본) |
+|---|---|---|
+| 새 트랙 확정 | `detect_conf` 이상 검출이 3번 연속 매칭 | 같음 |
+| 매칭 기준 | BEV 픽셀 박스 IoU ≥ 0.25 (OC-SORT, 거리·크기 검사 없음) | 같음 |
+| 미검출 트랙 유지 | 최대 10프레임, 11번째 연속 미검출에 삭제 (`max_age`) | 같음 |
+| 미검출 프레임 발행 | 안 함 | 안 함 |
+| 다시 검출될 때 | 3번 연속 매칭될 때까지 발행 안 함 (1프레임 놓치면 최소 3프레임 빠짐) | 공백이 `confirmed_max_gap` 이하면 바로 발행, 더 길면 3번 연속을 다시 요구 |
 
 ## 알고리즘 요약
 

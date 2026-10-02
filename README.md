@@ -254,6 +254,7 @@ Common node parameters (`_name:=value` for rosrun, args for launch):
 rosrun yolo26 yolo_detect.py _show_image:=true          # show detection window (default false, headless)
 rosrun yolo26 yolo_detect.py _imgsz:=960                # inference size (default 0 = native resolution)
 rosrun velodyne_detection velodyne_bev_detection.py _stale_timeout:=0.5   # seconds without input before publishing empty
+rosrun velodyne_detection velodyne_bev_detection.py _publish_policy:=streak   # previous OC-SORT publishing (default confirmed)
 roslaunch velodyne_detection velodyne_detection.launch model_version:=velodyne_v6
 ```
 
