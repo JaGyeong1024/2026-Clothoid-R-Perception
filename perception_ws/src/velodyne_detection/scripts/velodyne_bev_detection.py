@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 # Velodyne PointCloud -> BEV -> YOLO -> OC-SORT
 
-import os, sys, rospy, numpy as np, cv2
+import os
+# numpy(OpenBLAS) 연산을 1스레드로. 기본 다중 스레드는 물체 검출 중 CPU 270%까지 치솟고 출력은 같다.
+# numpy 를 가져오기 전에 설정해야 적용된다 (차량은 rosrun 이라 launch 의 env 로는 안 됨).
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+import sys, rospy, numpy as np, cv2
 from sensor_msgs.msg import PointCloud2, PointCloud, Image
 from sensor_msgs.msg import PointField
 from geometry_msgs.msg import Point32
