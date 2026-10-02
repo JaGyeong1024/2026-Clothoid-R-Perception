@@ -1,6 +1,9 @@
 # velodyne_detection
 
-Velodyne LiDAR 포인트클라우드를 BEV 이미지로 변환 후 YOLO + OC-SORT로 객체를 검출/추적하는 노드 (Python).
+Velodyne LiDAR 포인트클라우드를 BEV 이미지 → 정규화 HSV로 바꾼 뒤 YOLO26 + OC-SORT로 ERP를 검출·추적하는 노드 (Python).
+
+- 실행 파이썬은 시스템 python3(3.8)이다. ultralytics는 레포 안 `perception_ws/yolo26`(8.4.78)을 스크립트 기준 상대 경로로 불러온다. 시스템 ultralytics 8.0.196은 yolo26 모델을 못 읽는다.
+- BEV·정규화 HSV 변환은 `scripts/bev_input.py`가 정본이다. 학습 도구(`tools/velodyne_train`, 로컬 전용)도 이 파일을 쓴다.
 
 ## 토픽
 
@@ -29,7 +32,9 @@ Velodyne LiDAR 포인트클라우드를 BEV 이미지로 변환 후 YOLO + OC-SO
 | `model_path` | (필수) | YOLO 가중치 경로 (launch에서 `$(find velodyne_detection)/model/<ver>.pt`) |
 | `ocsort_path` | `/opt/OC_SORT` | OC-SORT clone 경로 (또는 `OC_SORT_PATH` env) |
 | `device` | `cuda` | YOLO inference device |
-| `detect_conf` | `0.4` | YOLO confidence threshold |
+| `detect_conf` | `0.5` | YOLO 신뢰도 문턱 (스크립트·launch 같음) |
+| `nms_iou` | `0.01` | NMS IoU. BEV에서는 물체가 겹칠 수 없어서 조금이라도 겹친 박스는 중복으로 지운다 |
+| `representation` | `hsv_v1` | 모델 입력 표현. 모델과 짝이다: v7 = `hsv_v1`, v6 = `raw` |
 | `voxel_size` | `0.05` | BEV voxel 해상도 (m) |
 | `x_range` / `y_range` / `z_range` | `[-15, 15]` / `[-15, 15]` / `[-2.5, 2]` | BEV 영역 |
 | `max_points_per_voxel` | `30` | density 채널 정규화 max |
@@ -51,11 +56,12 @@ Velodyne LiDAR 포인트클라우드를 BEV 이미지로 변환 후 YOLO + OC-SO
 
 ```
 PointCloud2 read (intensity 있으면 사용)
-  → BEV 이미지 변환 (height / intensity / density 3채널)
-  → YOLO inference (ultralytics)
+  → BEV 이미지 변환 (height / intensity / density 3채널, bev_input.bev_from_points)
+  → 정규화 HSV (지면 기준 높이 / 반사강도 / 점유율, bev_input.hsv_v1)
+  → YOLO inference (레포 ultralytics, NMS 추론 end2end=False, IoU 0.01)
   → OC-SORT 추적 (id 부여)
-  → BEV 픽셀 좌표 → LiDAR 좌표 역변환
-  → /perception/velodyne/centroids 발행
+  → BEV 픽셀 좌표 → LiDAR 좌표 역변환 (x = 15 − cy·0.05, y = 15 − cx·0.05)
+  → /perception/velodyne/centroids 발행 (header.stamp = 스캔 시각. 10 Hz 유지 발행은 직전 결과를 같은 스캔 시각으로 다시 낸다)
   → MarkerArray + BEV 이미지 발행
 ```
 
@@ -65,7 +71,8 @@ PointCloud2 read (intensity 있으면 사용)
 
 | 파일 | 용도 |
 |---|---|
-| `velodyne_v6.pt` | 유일한 가중치. launch(`model_version`)와 스크립트 기본값 모두 v6 |
+| `velodyne_v7.pt` | 기본(launch `model_version`, 스크립트 기본값). yolo26n, 정규화 HSV 입력, 2026-10-03 |
+| `velodyne_v6.pt` | 이전 모델(원본 BEV 입력). 되돌릴 때: `model_version:=velodyne_v6 representation:=raw` |
 
 이전 버전(`velodyne_v4.pt`, `velodyne_v5.pt`)은 참조되지 않아 제거했다. 필요하면 git 히스토리에서 복구한다.
 

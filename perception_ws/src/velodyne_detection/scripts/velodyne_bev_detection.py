@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Velodyne PointCloud -> BEV -> YOLO -> OC-SORT
+# Velodyne PointCloud -> BEV -> 정규화 HSV -> YOLO(NMS 추론) -> OC-SORT
 
 import os
 # numpy(OpenBLAS) 연산을 1스레드로. 기본 다중 스레드는 물체 검출 중 CPU 270%까지 치솟고 출력은 같다.
@@ -12,7 +12,13 @@ from geometry_msgs.msg import Point32
 import sensor_msgs.point_cloud2 as pc2
 from visualization_msgs.msg import Marker, MarkerArray
 from cv_bridge import CvBridge
+
+_HERE = os.path.dirname(os.path.realpath(__file__))
+sys.path.insert(0, _HERE)   # bev_input (점군 → BEV → 정규화 HSV, 학습 도구와 같은 정본)
+# 레포 안 ultralytics(perception_ws/yolo26, YOLO26). 시스템 8.0.196 은 yolo26 모델을 못 읽는다
+sys.path.insert(0, os.path.normpath(os.path.join(_HERE, "../../../yolo26")))
 from ultralytics import YOLO
+from bev_input import bev_from_points, REPRESENTATIONS
 
 # OC_SORT 경로: env OC_SORT_PATH 또는 rosparam ~ocsort_path
 _OCSORT_DEFAULT = os.environ.get("OC_SORT_PATH", "/opt/OC_SORT")
@@ -23,7 +29,9 @@ X_RANGE             = (-15.0, 15.0)
 Y_RANGE             = (-15.0, 15.0)
 Z_RANGE             = (-2.5,  2.0)
 MAX_PTS_PER_VOXEL   = 30
-DETECT_CONF         = 0.3
+DETECT_CONF         = 0.5
+NMS_IOU             = 0.01   # BEV 에서는 물체가 겹칠 수 없다. 겹친 박스는 중복이다
+REPRESENTATION      = "hsv_v1"
 OCSORT_IOU_THRESH   = 0.25
 OCSORT_MAX_AGE      = 10
 OCSORT_MIN_HITS     = 3
@@ -93,7 +101,7 @@ class VelodyneBevDetection:
 
         # Model
         model_path = rospy.get_param("~model_path", os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "..", "model", "velodyne_v6.pt"))
+            _HERE, "..", "model", "velodyne_v7.pt"))
         if not model_path:
             rospy.logerr("[velodyne_bev_detection] ~model_path not set")
             raise RuntimeError("~model_path is required")
@@ -107,10 +115,17 @@ class VelodyneBevDetection:
         self.z_rng   = tuple(rospy.get_param("~z_range", list(Z_RANGE)))
         self.max_pts = rospy.get_param("~max_points_per_voxel", MAX_PTS_PER_VOXEL)
         self.conf    = rospy.get_param("~detect_conf", DETECT_CONF)
+        self.nms_iou = rospy.get_param("~nms_iou", NMS_IOU)
+        rep_name     = rospy.get_param("~representation", REPRESENTATION)   # 모델과 짝: v7 = hsv_v1, v6 = raw
+        self.rep     = REPRESENTATIONS[rep_name]
         self.frame_id = rospy.get_param("~frame_id", "velodyne")
 
         self.img_h = int((self.x_rng[1] - self.x_rng[0]) / self.voxel)
         self.img_w = int((self.y_rng[1] - self.y_rng[0]) / self.voxel)
+
+        # 첫 추론은 CUDA 초기화로 1~2초 걸린다. 그동안 들어온 스캔이 버려지지 않게 시작할 때 한 번 미리 돌린다
+        self.detector.predict(np.zeros((self.img_h, self.img_w, 3), np.uint8), device=self.device, conf=self.conf,
+                              iou=self.nms_iou, end2end=False, verbose=False)
 
         self.tracker = OCSort(det_thresh    = self.conf,
                               iou_threshold = OCSORT_IOU_THRESH,
@@ -138,7 +153,8 @@ class VelodyneBevDetection:
         marker_topic   = rospy.get_param("~marker_topic",   "/perception/velodyne/markers")
         image_topic    = rospy.get_param("~image_topic",    "/perception/velodyne/bev_image")
 
-        rospy.Subscriber(input_topic, PointCloud2, self.lidar_cb, queue_size=1)
+        # buff_size: 점군 메시지(약 0.5 MB)가 기본 버퍼(64 KB)보다 커서, 없으면 처리가 밀릴 때 옛 메시지가 쌓여 지연이 누적된다
+        rospy.Subscriber(input_topic, PointCloud2, self.lidar_cb, queue_size=1, buff_size=2**24)
         self.pcl_pub    = rospy.Publisher(centroid_topic, PointCloud, queue_size=10)
         self.marker_pub = rospy.Publisher(marker_topic, MarkerArray, queue_size=10)
         self.img_pub    = rospy.Publisher(image_topic, Image, queue_size=10)
@@ -152,6 +168,8 @@ class VelodyneBevDetection:
 
         rospy.loginfo(f"[velodyne_bev_detection] subscribe={input_topic} "
                       f"-> centroids={centroid_topic}")
+        rospy.loginfo(f"[velodyne_bev_detection] model={model_path} representation={rep_name} "
+                      f"conf={self.conf} nms_iou={self.nms_iou}")
         rospy.loginfo(f"[velodyne_bev_detection] publish_policy={self.publish_policy} "
                       f"confirmed_max_gap={self.confirmed_max_gap}")
 
@@ -165,30 +183,10 @@ class VelodyneBevDetection:
             self.pcl_pub.publish(empty)
             self.last_msg = empty
             return
-        self.last_msg.header.stamp = rospy.Time.now()
-        self.pcl_pub.publish(self.last_msg)
+        self.pcl_pub.publish(self.last_msg)   # 직전 결과를 스캔 시각 그대로 다시 낸다(나이를 알 수 있게)
 
     def pc2_to_bev(self, pts):
-        if not pts.size:
-            return np.zeros((self.img_h, self.img_w, 3), np.uint8)
-        x, y, z, inten = pts.T
-        m = ((self.x_rng[0] <= x) & (x < self.x_rng[1]) &
-             (self.y_rng[0] <= y) & (y < self.y_rng[1]) &
-             (self.z_rng[0] <= z) & (z < self.z_rng[1]))
-        x, y, z, inten = x[m], y[m], z[m], inten[m]
-        ix = ((self.y_rng[1] - y) / self.voxel).astype(np.int32)
-        iy = ((self.x_rng[1] - x) / self.voxel).astype(np.int32)
-        ix = np.clip(ix, 0, self.img_w - 1); iy = np.clip(iy, 0, self.img_h - 1)
-        hmap = np.full((self.img_h, self.img_w), self.z_rng[0], np.float32)
-        imap = np.zeros_like(hmap); dmap = np.zeros_like(hmap, np.int32)
-        np.maximum.at(hmap, (iy, ix), z)
-        np.add.at(imap, (iy, ix), inten)
-        np.add.at(dmap, (iy, ix), 1)
-        h = ((np.clip(hmap, *self.z_rng) - self.z_rng[0]) /
-             (self.z_rng[1] - self.z_rng[0]) * 255).astype(np.uint8)
-        i = np.zeros_like(imap, np.uint8); i[dmap>0] = np.clip(imap[dmap>0]/dmap[dmap>0],0,255).astype(np.uint8)
-        d = (np.clip(dmap,0,self.max_pts)/self.max_pts*255).astype(np.uint8)
-        return cv2.merge([d,i,h])
+        return bev_from_points(pts, self.voxel, self.x_rng, self.y_rng, self.z_rng, self.max_pts)
 
     def track_step(self, dets):
         """dets [M,5] -> 발행할 트랙 [K,5] (x1,y1,x2,y2,id)."""
@@ -229,9 +227,10 @@ class VelodyneBevDetection:
         bev = self.pc2_to_bev(pts)
         vis = bev.copy()
 
+        # NMS 추론(end2end=False): yolo26 기본(NMS 없음)은 한 물체에 거의 같은 박스를 가끔 두 개 내서 트랙이 쪼개진다
         dets = np.asarray([[*b.xyxy[0].cpu().numpy(), float(b.conf[0])]
-                           for b in self.detector.predict(bev, device=self.device,
-                                                          conf=self.conf)[0].boxes],
+                           for b in self.detector.predict(self.rep(bev), device=self.device, conf=self.conf,
+                                                          iou=self.nms_iou, end2end=False, verbose=False)[0].boxes],
                           dtype=np.float32)
         if dets.size == 0:
             dets = np.empty((0,5), np.float32)
@@ -240,13 +239,13 @@ class VelodyneBevDetection:
 
         pcl_msg = PointCloud()
         pcl_msg.header.frame_id = self.frame_id
-        pcl_msg.header.stamp = rospy.Time.now()
+        pcl_msg.header.stamp = msg.header.stamp   # 스캔 시각
         m_arr = MarkerArray()
 
         for x1,y1,x2,y2,tid in tracks:
             cx, cy = (x1+x2)/2, (y1+y2)/2
-            lx = self.x_rng[0] + (self.img_h-1-cy)*self.voxel
-            ly = self.y_rng[0] + (self.img_w-1-cx)*self.voxel
+            lx = self.x_rng[1] - cy*self.voxel   # 픽셀 iy = (x_max - x)/voxel 의 역변환
+            ly = self.y_rng[1] - cx*self.voxel
             pcl_msg.points.append(Point32(lx,ly,0.0))
 
             mk = Marker(); mk.header = pcl_msg.header

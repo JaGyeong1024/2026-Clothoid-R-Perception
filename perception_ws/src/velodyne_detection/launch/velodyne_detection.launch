@@ -8,10 +8,12 @@
   <arg name="image_topic"    default="/perception/velodyne/bev_image"/>
 
   <!-- Model / Tracking -->
-  <arg name="model_version"  default="velodyne_v6"/>
+  <arg name="model_version"  default="velodyne_v7"/>
+  <arg name="representation" default="hsv_v1"/>   <!-- 모델과 짝: v7 = hsv_v1, v6 = raw -->
   <arg name="ocsort_path"    default="/opt/OC_SORT"/>
   <arg name="device"         default="cuda"/>
-  <arg name="detect_conf"    default="0.4"/>
+  <arg name="detect_conf"    default="0.5"/>
+  <arg name="nms_iou"        default="0.01"/>
   <arg name="frame_id"       default="velodyne"/>
   <arg name="publish_policy" default="confirmed"/>  <!-- confirmed | streak (OC-SORT 기본) -->
   <arg name="confirmed_max_gap" default="3"/>
@@ -28,6 +30,8 @@
     <param name="ocsort_path"          value="$(arg ocsort_path)"/>
     <param name="device"               value="$(arg device)"/>
     <param name="detect_conf"          value="$(arg detect_conf)"/>
+    <param name="nms_iou"              value="$(arg nms_iou)"/>
+    <param name="representation"       value="$(arg representation)"/>
     <param name="frame_id"             value="$(arg frame_id)"/>
     <param name="publish_policy"       value="$(arg publish_policy)"/>
     <param name="confirmed_max_gap"    value="$(arg confirmed_max_gap)"/>
